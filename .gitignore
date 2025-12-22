@@ -11,3 +11,4 @@ wheels/
 .venv/
 .idea
 .git
+con_file
