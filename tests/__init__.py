@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-@ProjectName: webctp
+@ProjectName: homalos-data
 @FileName   : __init__.py.py
-@Date       : 2025/12/3 14:56
+@Date       : 2025/12/22 21:26
 @Author     : Lumosylva
 @Email      : donnymoving@gmail.com
 @Software   : PyCharm
