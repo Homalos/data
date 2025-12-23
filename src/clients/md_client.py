@@ -11,7 +11,8 @@
 """
 import time
 import uuid
-from typing import Callable, Any
+import asyncio
+from typing import Callable, Any, Optional
 
 from ..ctp import thostmduserapi as mdapi
 
@@ -34,6 +35,15 @@ class MdClient(mdapi.CThostFtdcMdSpi):
         self._connected: bool = False
         # Reconnection control
         self._reconnection_ctrl = ReconnectionController(max_attempts=5, interval=10.0, client_type="Md")
+        
+        # 存储相关（新增）
+        self._tick_storage: Optional[Any] = None  # TickStorage实例
+        self._instrument_manager: Optional[Any] = None  # InstrumentManager实例
+        self._kline_builder: Optional[Any] = None  # KLineBuilder实例（新增）
+        
+        # 主event loop引用（将在set_event_loop中设置）
+        self._main_loop: Optional[asyncio.AbstractEventLoop] = None
+        
         logger.info(f"Md front_address: {self._front_address}", tag='md_client')
 
     @property
@@ -55,6 +65,46 @@ class MdClient(mdapi.CThostFtdcMdSpi):
             callback: 回调函数，接收一个字典参数（包含响应信息）并返回None
         """
         self._rsp_callback = callback
+    
+    def set_tick_storage(self, tick_storage):
+        """
+        设置Tick存储引擎
+        
+        Args:
+            tick_storage: TickStorage实例
+        """
+        self._tick_storage = tick_storage
+        logger.info("Tick存储引擎已注入到MdClient")
+    
+    def set_instrument_manager(self, instrument_manager):
+        """
+        设置合约管理器
+        
+        Args:
+            instrument_manager: InstrumentManager实例
+        """
+        self._instrument_manager = instrument_manager
+        logger.info("合约管理器已注入到MdClient")
+    
+    def set_kline_builder(self, kline_builder):
+        """
+        设置K线合成器
+        
+        Args:
+            kline_builder: KLineBuilder实例
+        """
+        self._kline_builder = kline_builder
+        logger.info("K线合成器已注入到MdClient")
+    
+    def set_event_loop(self, loop):
+        """
+        设置主event loop引用
+        
+        Args:
+            loop: asyncio event loop实例
+        """
+        self._main_loop = loop
+        logger.info(f"Event loop已注入到MdClient: {loop}")
 
     def method_called(self, msg_type: str, ret: int):
         """
@@ -321,6 +371,38 @@ class MdClient(mdapi.CThostFtdcMdSpi):
             "reserve1": depth_marketdata.reserve1,
             "reserve2": depth_marketdata.reserve2
             }
+        
+        # 【新增】存储tick数据（使用线程安全的方式调度异步任务）
+        if self._tick_storage and self._main_loop:
+            try:
+                logger.debug(f"准备调度tick存储任务: {depth_data.get('InstrumentID')}, loop={self._main_loop}")
+                # 使用保存的主event loop调度任务
+                future = asyncio.run_coroutine_threadsafe(
+                    self._tick_storage.store_tick(depth_data),
+                    self._main_loop
+                )
+                # 不等待结果，让它在后台执行
+                logger.debug(f"✅ 已调度tick存储任务: {depth_data.get('InstrumentID')}")
+            except Exception as e:
+                logger.error(f"存储tick数据失败: {e}", exc_info=True)
+        elif not self._tick_storage:
+            logger.warning("Tick存储引擎未注入")
+        elif not self._main_loop:
+            logger.warning("Event loop未注入，无法调度存储任务")
+        
+        # 【新增】合成K线（使用线程安全的方式调度异步任务）
+        if self._kline_builder and self._main_loop:
+            try:
+                # 使用保存的主event loop调度任务
+                future = asyncio.run_coroutine_threadsafe(
+                    self._kline_builder.on_tick(depth_data),
+                    self._main_loop
+                )
+                # 不等待结果，让它在后台执行
+            except Exception as e:
+                logger.error(f"合成K线失败: {e}")
+        
+        # 原有逻辑：构建响应并回调
         response = {
             Constant.MessageType: Constant.OnRtnDepthMarketData,
             Constant.DepthMarketData: depth_data
