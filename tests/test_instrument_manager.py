@@ -23,17 +23,13 @@ class TestInstrumentManager:
         # 创建测试数据
         manager = InstrumentManager(cache_path="data/test_instruments.json")
         
-        # 添加测试合约
+        # 添加测试合约（使用简化的数据结构）
         test_instrument = InstrumentInfo(
             instrument_id="rb2505",
-            instrument_name="螺纹钢2505",
             exchange_id="SHFE",
             product_id="rb",
             volume_multiple=10,
-            price_tick=1.0,
-            create_date="20240101",
-            expire_date="20250515",
-            is_trading=True
+            price_tick=1.0
         )
         
         manager.instruments["rb2505"] = test_instrument
@@ -48,73 +44,45 @@ class TestInstrumentManager:
         assert success
         assert len(manager2.instruments) == 1
         assert "rb2505" in manager2.instruments
-        assert manager2.instruments["rb2505"].instrument_name == "螺纹钢2505"
+        assert manager2.instruments["rb2505"].exchange_id == "SHFE"
         
         # 清理测试文件
         Path("data/test_instruments.json").unlink(missing_ok=True)
     
-    def test_get_trading_instruments(self):
-        """测试获取可交易合约"""
-        manager = InstrumentManager()
+    def test_is_futures(self):
+        """测试期货识别"""
+        # 期货合约
+        assert InstrumentInfo.is_futures("rb2505")
+        assert InstrumentInfo.is_futures("ag2602")
+        assert InstrumentInfo.is_futures("IC2501")
         
-        # 添加测试数据
-        manager.instruments["rb2505"] = InstrumentInfo(
-            instrument_id="rb2505",
-            instrument_name="螺纹钢2505",
-            exchange_id="SHFE",
-            product_id="rb",
-            volume_multiple=10,
-            price_tick=1.0,
-            create_date="20240101",
-            expire_date="20250515",
-            is_trading=True
-        )
+        # 期权合约（应该被过滤）
+        assert not InstrumentInfo.is_futures("rb2505-C-4000")
+        assert not InstrumentInfo.is_futures("ag2602-P-5000")
         
-        manager.instruments["rb2506"] = InstrumentInfo(
-            instrument_id="rb2506",
-            instrument_name="螺纹钢2506",
-            exchange_id="SHFE",
-            product_id="rb",
-            volume_multiple=10,
-            price_tick=1.0,
-            create_date="20240101",
-            expire_date="20250615",
-            is_trading=False  # 不可交易
-        )
-        
-        trading_instruments = manager.get_trading_instruments()
-        
-        assert len(trading_instruments) == 1
-        assert "rb2505" in trading_instruments
-        assert "rb2506" not in trading_instruments
+        # 无效合约
+        assert not InstrumentInfo.is_futures("")
+        assert not InstrumentInfo.is_futures("123")
     
     def test_get_instruments_by_exchange(self):
         """测试按交易所获取合约"""
         manager = InstrumentManager()
         
-        # 添加不同交易所的合约
+        # 添加不同交易所的合约（使用简化的数据结构）
         manager.instruments["rb2505"] = InstrumentInfo(
             instrument_id="rb2505",
-            instrument_name="螺纹钢2505",
             exchange_id="SHFE",
             product_id="rb",
             volume_multiple=10,
-            price_tick=1.0,
-            create_date="20240101",
-            expire_date="20250515",
-            is_trading=True
+            price_tick=1.0
         )
         
         manager.instruments["IF2501"] = InstrumentInfo(
             instrument_id="IF2501",
-            instrument_name="沪深300股指期货2501",
             exchange_id="CFFEX",
             product_id="IF",
             volume_multiple=300,
-            price_tick=0.2,
-            create_date="20240101",
-            expire_date="20250115",
-            is_trading=True
+            price_tick=0.2
         )
         
         shfe_instruments = manager.get_instruments_by_exchange("SHFE")

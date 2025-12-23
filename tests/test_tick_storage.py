@@ -20,6 +20,8 @@ class TestTickBuffer:
         assert buffer.max_size == 100
         assert buffer.flush_interval == 5.0
         assert buffer.size() == 0
+        assert buffer._total_received == 0
+        assert buffer._total_flushed == 0
     
     def test_add_and_size(self):
         """测试添加数据"""
@@ -33,7 +35,7 @@ class TestTickBuffer:
         assert not buffer.is_full()
     
     def test_is_full(self):
-        """测试缓冲区满"""
+        """测试缓冲区满（注意：新版本移除了maxlen限制，不会真正"满"）"""
         buffer = TickBuffer(max_size=3)
         
         buffer.add({"id": 1})
@@ -41,7 +43,11 @@ class TestTickBuffer:
         assert not buffer.is_full()
         
         buffer.add({"id": 3})
-        assert buffer.is_full()
+        assert buffer.is_full()  # 达到建议大小
+        
+        # 新版本可以继续添加，不会丢弃数据
+        buffer.add({"id": 4})
+        assert buffer.size() == 4  # 超过max_size但不丢弃
     
     @pytest.mark.asyncio
     async def test_get_batch(self):
@@ -91,7 +97,7 @@ class TestTickStorage:
     """测试Tick存储引擎"""
     
     def test_convert_to_point(self):
-        """测试数据点转换"""
+        """测试数据点转换（按合约分表）"""
         config = InfluxDBConfig(
             host="http://localhost:8181",
             token="test-token",
@@ -124,8 +130,9 @@ class TestTickStorage:
         point = storage._convert_to_point(tick_data)
         
         assert point is not None
-        assert point["measurement"] == "market_tick"
-        assert point["tags"]["instrument_id"] == "rb2505"
+        # 新版本：按合约分表，表名为 tick_{instrument_id.lower()}
+        assert point["measurement"] == "tick_rb2505"
+        assert point["tags"]["instrument_id"] == "rb2505"  # 保留原始大小写
         assert point["tags"]["exchange_id"] == "SHFE"
         assert point["fields"]["last_price"] == 3500.0
         assert point["fields"]["volume"] == 1000
@@ -158,7 +165,7 @@ class TestTickStorage:
         assert timestamp.second == 15
     
     def test_get_stats(self):
-        """测试统计信息"""
+        """测试统计信息（包含失败处理器统计）"""
         config = InfluxDBConfig(
             host="http://localhost:8181",
             token="test-token",
@@ -171,6 +178,8 @@ class TestTickStorage:
         assert "write_count" in stats
         assert "error_count" in stats
         assert "running" in stats
+        # 新版本：包含失败处理器统计
+        # assert "failure" in stats  # 初始化前可能为空
         assert stats["write_count"] == 0
         assert stats["error_count"] == 0
         assert stats["running"] == False
