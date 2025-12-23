@@ -76,7 +76,7 @@ class HeartbeatManager:
     async def stop(self):
         """停止心跳检测"""
         self.is_running = False
-        if self._task:
+        if self._task and not self._task.done():
             self._task.cancel()
             try:
                 await self._task

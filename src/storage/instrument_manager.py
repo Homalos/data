@@ -14,20 +14,63 @@ from loguru import logger
 
 @dataclass
 class InstrumentInfo:
-    """合约信息"""
+    """合约信息（简化版，仅期货）"""
     instrument_id: str          # 合约代码
-    instrument_name: str        # 合约名称
     exchange_id: str            # 交易所代码
     product_id: str             # 品种代码
     volume_multiple: int        # 合约乘数
     price_tick: float           # 最小变动价位
-    create_date: str            # 创建日期
-    expire_date: str            # 到期日期
-    is_trading: bool            # 是否可交易
     
     def to_dict(self) -> Dict:
         """转换为字典"""
         return asdict(self)
+    
+    @staticmethod
+    def is_futures(instrument_id: str) -> bool:
+        """
+        判断是否为期货合约
+        
+        期货合约特征：
+        1. 代码长度 <= 6
+        2. 以字母开头，后跟数字（如 ag2506, rb2505, ps2606）
+        3. 不包含 '-'（期权标识）
+        4. 如果包含 'C' 或 'P'，必须在前2个字符内（如 IC, IH 是股指期货）
+        
+        Args:
+            instrument_id: 合约代码
+            
+        Returns:
+            是否为期货合约
+        """
+        if not instrument_id:
+            return False
+        
+        # 长度检查：期货代码最长6位
+        if len(instrument_id) > 6:
+            return False
+        
+        # 期权标识检查：包含 '-' 的通常是期权
+        if '-' in instrument_id:
+            return False
+        
+        # 必须以字母开头
+        if not instrument_id[0].isalpha():
+            return False
+        
+        # 必须包含数字
+        if not any(c.isdigit() for c in instrument_id):
+            return False
+        
+        # 如果包含 'C' 或 'P'，检查位置
+        # 股指期货如 IC2501, IH2501 的 C 和 H 在前2个字符
+        # 期权如 SR505C6000 的 C 在后面
+        for i, c in enumerate(instrument_id):
+            if c in ['C', 'P']:
+                # 如果 C 或 P 在第3个字符之后，很可能是期权
+                if i >= 2:
+                    return False
+        
+        return True
 
 
 class InstrumentManager:
@@ -86,8 +129,8 @@ class InstrumentManager:
                     if len(instruments_list) % 100 == 0:
                         logger.info(f"已查询 {len(instruments_list)} 个合约...")
                         
-                except Exception as e:
-                    logger.error(f"解析合约信息失败: {e}")
+                except Exception as err:
+                    logger.error(f"解析合约信息失败: {err}")
             
             # 查询完成
             if is_last:
@@ -141,22 +184,26 @@ class InstrumentManager:
             td_client.rsp_callback = original_callback
     
     def save_to_cache(self):
-        """保存合约信息到JSON文件"""
+        """保存合约信息到JSON文件（仅期货）"""
         try:
+            # 过滤出期货合约
+            futures_instruments = [
+                inst.to_dict() 
+                for inst in self.instruments.values()
+                if InstrumentInfo.is_futures(inst.instrument_id)
+            ]
+            
             cache_data = {
                 "update_time": self.update_time.isoformat() if self.update_time else None,
-                "total_count": len(self.instruments),
-                "instruments": [
-                    inst.to_dict() 
-                    for inst in self.instruments.values()
-                ]
+                "total_count": len(futures_instruments),
+                "instruments": futures_instruments
             }
             
             with open(self.cache_path, 'w', encoding='utf-8') as f:
                 json.dump(cache_data, f, ensure_ascii=False, indent=2)
             
             logger.info(f"合约信息已保存到: {self.cache_path}")
-            logger.info(f"共 {len(self.instruments)} 个合约")
+            logger.info(f"共 {len(futures_instruments)} 个期货合约（已过滤期权）")
             
         except Exception as e:
             logger.error(f"保存合约缓存失败: {e}", exc_info=True)
@@ -180,7 +227,14 @@ class InstrumentManager:
             # 解析合约信息
             self.instruments = {}
             for inst_dict in cache_data.get("instruments", []):
-                info = InstrumentInfo(**inst_dict)
+                # 兼容旧格式和新格式
+                info = InstrumentInfo(
+                    instrument_id=inst_dict["instrument_id"],
+                    exchange_id=inst_dict["exchange_id"],
+                    product_id=inst_dict["product_id"],
+                    volume_multiple=inst_dict["volume_multiple"],
+                    price_tick=inst_dict["price_tick"]
+                )
                 self.instruments[info.instrument_id] = info
             
             # 解析更新时间
@@ -188,7 +242,7 @@ class InstrumentManager:
             if update_time_str:
                 self.update_time = datetime.fromisoformat(update_time_str)
             
-            logger.info(f"从缓存加载 {len(self.instruments)} 个合约")
+            logger.info(f"从缓存加载 {len(self.instruments)} 个期货合约")
             logger.info(f"缓存更新时间: {self.update_time}")
             
             return True
@@ -196,22 +250,6 @@ class InstrumentManager:
         except Exception as e:
             logger.error(f"加载合约缓存失败: {e}", exc_info=True)
             return False
-    
-    def get_trading_instruments(self) -> List[str]:
-        """
-        获取所有可交易合约代码
-        
-        Returns:
-            可交易合约代码列表
-        """
-        trading_instruments = [
-            inst_id 
-            for inst_id, inst in self.instruments.items()
-            if inst.is_trading
-        ]
-        
-        logger.info(f"可交易合约数量: {len(trading_instruments)}")
-        return trading_instruments
     
     def get_instrument(self, instrument_id: str) -> Optional[InstrumentInfo]:
         """

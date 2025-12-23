@@ -16,7 +16,6 @@ from loguru import logger
 
 from ..services.connection import MdConnection
 from ..services.cache_manager import CacheManager
-from ..services.strategy_manager import StrategyManager
 from ..utils import GlobalConfig
 from ..utils.metrics import MetricsCollector
 
@@ -24,7 +23,6 @@ from ..utils.metrics import MetricsCollector
 # 全局实例
 _cache_manager: Optional[CacheManager] = None
 _metrics_collector: Optional[MetricsCollector] = None
-_strategy_manager: Optional[StrategyManager] = None
 _tick_storage: Optional[Any] = None  # 新增：Tick存储
 _instrument_manager: Optional[Any] = None  # 新增：合约管理器
 _kline_builder: Optional[Any] = None  # 新增：K线合成器
@@ -40,9 +38,9 @@ async def startup_event():
     """
     应用启动事件处理器
     
-    初始化 CacheManager、MetricsCollector、StrategyManager 和存储服务
+    初始化 CacheManager、MetricsCollector 和存储服务
     """
-    global _cache_manager, _metrics_collector, _strategy_manager, _tick_storage, _instrument_manager, _kline_builder, _kline_storage, _initialized
+    global _cache_manager, _metrics_collector, _tick_storage, _instrument_manager, _kline_builder, _kline_storage, _initialized
     
     if _initialized:
         return
@@ -76,17 +74,6 @@ async def startup_event():
     except Exception as e:
         logger.warning(f"CacheManager 初始化失败，将在无缓存模式下运行: {e}")
         _cache_manager = None
-    
-    # 初始化 StrategyManager
-    try:
-        _strategy_manager = StrategyManager(
-            cache_manager=_cache_manager,
-            max_strategies=GlobalConfig.Strategy.max_strategies if hasattr(GlobalConfig, 'Strategy') else None
-        )
-        logger.info("StrategyManager 初始化成功")
-    except Exception as e:
-        logger.warning(f"StrategyManager 初始化失败: {e}")
-        _strategy_manager = None
     
     # 【新增】初始化存储服务
     if hasattr(GlobalConfig, 'Storage') and GlobalConfig.Storage.enabled:
@@ -141,23 +128,11 @@ async def shutdown_event():
     """
     应用关闭事件处理器
     
-    清理 CacheManager、MetricsCollector、StrategyManager 和存储服务资源
+    清理 CacheManager、MetricsCollector 和存储服务资源
     """
-    global _cache_manager, _metrics_collector, _strategy_manager, _tick_storage, _kline_builder, _kline_storage, _initialized
+    global _cache_manager, _metrics_collector, _tick_storage, _kline_builder, _kline_storage, _initialized
     
     logger.info("正在关闭行情服务...")
-    
-    # 停止所有策略
-    if _strategy_manager:
-        try:
-            # 停止所有运行中的策略
-            strategies = _strategy_manager.list_strategies()
-            for strategy_info in strategies:
-                if strategy_info.status.value == "running":
-                    await _strategy_manager.stop_strategy(strategy_info.strategy_id)
-            logger.info("所有策略已停止")
-        except Exception as e:
-            logger.error(f"停止策略失败: {e}")
     
     # 【新增】关闭存储服务
     if _kline_builder:
@@ -238,10 +213,6 @@ class MdConnectionWithMetrics(MdConnection):
         # 注入 MetricsCollector
         if _metrics_collector:
             client.set_metrics_collector(_metrics_collector)
-        
-        # 注入 StrategyManager
-        if _strategy_manager:
-            client.set_strategy_manager(_strategy_manager)
         
         # 【新增】注入存储服务
         if _tick_storage:
