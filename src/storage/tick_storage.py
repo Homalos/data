@@ -10,6 +10,7 @@ from loguru import logger
 
 from .influxdb_client import InfluxDBClientWrapper
 from .tick_buffer import TickBuffer
+from .failure_handler import FailureHandler
 
 
 class TickStorage:
@@ -29,10 +30,12 @@ class TickStorage:
         self.config = influxdb_config
         self._influxdb: Optional[InfluxDBClientWrapper] = None
         self._buffer: Optional[TickBuffer] = None
+        self._failure_handler: Optional[FailureHandler] = None
         self._write_task: Optional[asyncio.Task] = None
         self._running: bool = False
         self._write_count: int = 0
         self._error_count: int = 0
+        self._max_retries: int = 3  # 最大重试次数
     
     async def initialize(self):
         """初始化存储引擎"""
@@ -50,6 +53,9 @@ class TickStorage:
                 max_size=self.config.batch_size,
                 flush_interval=self.config.flush_interval
             )
+            
+            # 初始化失败数据处理器
+            self._failure_handler = FailureHandler(failure_dir="data/failures")
             
             # 启动后台写入任务
             self._running = True
@@ -113,7 +119,7 @@ class TickStorage:
     
     async def _write_batch(self, batch: List[Dict]):
         """
-        批量写入tick数据到InfluxDB
+        批量写入tick数据到InfluxDB（带重试机制）
         
         Args:
             batch: tick数据列表
@@ -137,16 +143,50 @@ class TickStorage:
             
             logger.info(f"准备写入 {len(points)} 个数据点到InfluxDB")
             
-            # 写入InfluxDB
-            await self._influxdb.write_points(points)
+            # 带重试的写入
+            success = await self._write_with_retry(points)
             
-            self._write_count += len(points)
-            logger.info(f"✅ 成功写入 {len(points)} 条tick数据（累计: {self._write_count}）")
+            if success:
+                self._write_count += len(points)
+                logger.info(f"✅ 成功写入 {len(points)} 条tick数据（累计: {self._write_count}）")
+            else:
+                # 保存失败数据到本地文件
+                logger.error(f"❌ 写入失败，保存到本地文件")
+                await self._failure_handler.save_failed_batch(points, "tick")
             
         except Exception as e:
-            logger.error(f"❌ 批量写入失败: {e}", exc_info=True)
+            logger.error(f"❌ 批量写入异常: {e}", exc_info=True)
             self._error_count += 1
-            raise
+    
+    async def _write_with_retry(self, points: List[Dict]) -> bool:
+        """
+        带重试机制的写入
+        
+        Args:
+            points: 数据点列表
+            
+        Returns:
+            是否写入成功
+        """
+        for attempt in range(self._max_retries):
+            try:
+                await self._influxdb.write_points(points)
+                return True
+                
+            except Exception as e:
+                if attempt < self._max_retries - 1:
+                    wait_time = 2 ** attempt  # 指数退避: 1s, 2s, 4s
+                    logger.warning(
+                        f"⚠️ 写入失败，{wait_time}秒后重试 "
+                        f"({attempt + 1}/{self._max_retries}): {e}"
+                    )
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"❌ 写入失败，已达最大重试次数 ({self._max_retries}): {e}")
+                    self._error_count += 1
+                    return False
+        
+        return False
     
     def _convert_to_point(self, tick_data: Dict) -> Optional[Dict]:
         """
@@ -168,12 +208,14 @@ class TickStorage:
             timestamp = self._parse_timestamp(tick_data)
             
             # 使用合约ID作为measurement名称（按合约分表）
-            measurement = f"tick_{instrument_id}"
+            # 统一转换为小写，避免大小写不一致问题
+            measurement = f"tick_{instrument_id.lower()}"
             
             # 构建数据点（InfluxDB 3.x格式）
             point = {
                 "measurement": measurement,
                 "tags": {
+                    "instrument_id": instrument_id,  # 保留原始大小写用于查询
                     "exchange_id": tick_data.get("ExchangeID", ""),
                     "trading_day": tick_data.get("TradingDay", ""),
                 },
@@ -244,11 +286,13 @@ class TickStorage:
             统计信息字典
         """
         buffer_stats = self._buffer.get_stats() if self._buffer else {}
+        failure_stats = self._failure_handler.get_stats() if self._failure_handler else {}
         
         return {
             "write_count": self._write_count,
             "error_count": self._error_count,
             "buffer": buffer_stats,
+            "failure": failure_stats,
             "running": self._running,
         }
     

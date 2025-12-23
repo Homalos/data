@@ -21,12 +21,12 @@ class TickBuffer:
         初始化缓冲器
         
         Args:
-            max_size: 最大缓冲数量
+            max_size: 建议的批量大小（用于触发写入，不限制容量）
             flush_interval: 刷新间隔（秒）
         """
         self.max_size = max_size
         self.flush_interval = flush_interval
-        self._buffer: deque = deque(maxlen=max_size)
+        self._buffer: deque = deque()  # 移除maxlen限制，不丢弃任何数据
         self._lock = asyncio.Lock()
         self._total_received = 0
         self._total_flushed = 0
@@ -40,6 +40,13 @@ class TickBuffer:
         """
         self._buffer.append(tick_data)
         self._total_received += 1
+        
+        # 背压警告：当缓冲区积压过多时发出警告
+        buffer_size = len(self._buffer)
+        if buffer_size > self.max_size * 5:
+            logger.warning(f"⚠️ Tick缓冲区积压严重: {buffer_size}条，写入速度可能跟不上接收速度")
+        elif buffer_size > self.max_size * 2:
+            logger.info(f"Tick缓冲区积压: {buffer_size}条")
     
     def is_full(self) -> bool:
         """
