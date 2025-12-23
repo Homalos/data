@@ -131,6 +131,42 @@ class SyncApiConfig:
     stop_timeout: float = 5.0  # 停止服务默认超时（秒）
 
 
+@dataclass
+class InfluxDBConfig:
+    """InfluxDB 3.x 配置"""
+    host: str = "http://localhost:8181"
+    token: str = ""
+    database: str = "tick_data"
+    batch_size: int = 1000
+    flush_interval: float = 5.0
+
+
+@dataclass
+class InstrumentsConfig:
+    """合约管理配置"""
+    cache_path: str = "./data/instruments.json"
+    auto_update: bool = True
+    update_interval: int = 86400  # 每天更新一次
+
+
+@dataclass
+class KLineConfig:
+    """K线配置"""
+    enabled: bool = True
+    periods: List[str] = field(
+        default_factory=lambda: ["1m", "3m", "5m", "10m", "15m", "30m", "60m", "1d"]
+    )
+
+
+@dataclass
+class StorageConfig:
+    """存储配置"""
+    enabled: bool = False
+    influxdb: InfluxDBConfig = field(default_factory=InfluxDBConfig)
+    instruments: InstrumentsConfig = field(default_factory=InstrumentsConfig)
+    kline: KLineConfig = field(default_factory=KLineConfig)
+
+
 class GlobalConfig(object):
     TdFrontAddress: str
     MdFrontAddress: str
@@ -151,6 +187,7 @@ class GlobalConfig(object):
     Strategy: StrategyConfig
     Alerts: AlertsConfig
     SyncApi: SyncApiConfig
+    Storage: StorageConfig
 
     @classmethod
     def load_config(cls, config_file_path: str):
@@ -348,6 +385,32 @@ class GlobalConfig(object):
                         "WEBCTP_SYNC_API_STOP_TIMEOUT",
                         sync_api_config.get("StopTimeout", 5.0),
                     )
+                ),
+            )
+
+            # 加载存储配置（可选）
+            storage_config = config.get("Storage", {})
+            influxdb_config = storage_config.get("InfluxDB", {})
+            instruments_config = storage_config.get("Instruments", {})
+            kline_config = storage_config.get("KLine", {})
+            
+            cls.Storage = StorageConfig(
+                enabled=bool(storage_config.get("Enabled", False)),
+                influxdb=InfluxDBConfig(
+                    host=influxdb_config.get("Host", "http://localhost:8181"),
+                    token=influxdb_config.get("Token", ""),
+                    database=influxdb_config.get("Database", "tick_data"),
+                    batch_size=int(influxdb_config.get("BatchSize", 1000)),
+                    flush_interval=float(influxdb_config.get("FlushInterval", 5.0)),
+                ),
+                instruments=InstrumentsConfig(
+                    cache_path=instruments_config.get("CachePath", "./data/instruments.json"),
+                    auto_update=bool(instruments_config.get("AutoUpdate", True)),
+                    update_interval=int(instruments_config.get("UpdateInterval", 86400)),
+                ),
+                kline=KLineConfig(
+                    enabled=bool(kline_config.get("Enabled", True)),
+                    periods=kline_config.get("Periods", ["1m", "3m", "5m", "10m", "15m", "30m", "60m", "1d"]),
                 ),
             )
 
