@@ -38,6 +38,10 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
         # Settlement confirmation state
         self._pending_login_response: dict | None = None
         self._settlement_confirmed: bool = False
+        # Instrument manager (新增)
+        self._instrument_manager = None
+        self._auto_query_instruments: bool = True  # 是否自动查询合约
+        self._instruments_cache: list = []  # 临时缓存查询到的合约
         logger.info(f"Td front_address: {self._front_address}, broker_id: {self._broker_id}, "
                     f"auth_code: {self._auth_code}, app_id: {self._app_id}, user_id: {self._user_id}")
 
@@ -60,6 +64,16 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
                      字典包含响应数据的具体内容
         """
         self._rsp_callback = callback
+    
+    def set_instrument_manager(self, instrument_manager):
+        """
+        设置合约管理器
+        
+        Args:
+            instrument_manager: InstrumentManager实例
+        """
+        self._instrument_manager = instrument_manager
+        logger.info("合约管理器已注入到TdClient")
 
     def method_called(self, msg_type: str, ret: int):
         """处理API方法调用结果
@@ -90,9 +104,10 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
 
         注意：调用此方法后，实例将不再可用，需要重新创建才能再次连接
         """
-        self._api.RegisterSpi(None)
-        self._api.Release()
-        self._api = None
+        if self._api is not None:
+            self._api.RegisterSpi(None)
+            self._api.Release()
+            self._api = None
         self._connected = False
 
     def connect(self) -> None:
@@ -325,6 +340,20 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
                 self.rsp_callback(response)
                 self._pending_login_response = None
                 logger.info("login response sent to client after settlement confirmation")
+            
+            # 【新增】自动查询全市场合约
+            if self._auto_query_instruments and self._instrument_manager:
+                logger.info("开始自动查询全市场合约...")
+                # 发起合约查询请求（查询所有合约，InstrumentID为空）
+                req = tdapi.CThostFtdcQryInstrumentField()
+                req.InstrumentID = ""  # 空表示查询所有合约
+                # 等待1秒避免查询过快
+                time.sleep(1)
+                ret = self._api.ReqQryInstrument(req, 0)
+                if ret == 0:
+                    logger.info("合约查询请求已发送")
+                else:
+                    logger.error(f"合约查询请求发送失败，返回码: {ret}")
         else:
             logger.error(f"settlement info confirm failed, ErrorID: {rsp_info_field.ErrorID}, ErrorMsg: {rsp_info_field.ErrorMsg}")
             
@@ -439,23 +468,61 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
         Returns:
             无返回值，通过回调函数将响应数据返回给调用方
         """
-        logger.info(f"[TdClient-回调] OnRspQryInstrument 被触发！")
-        logger.info(f"[TdClient-回调] 参数 - instrument_field存在: {instrument_field is not None}, RequestID: {request_id}, IsLast: {is_last}")
+        logger.debug(f"[TdClient-回调] OnRspQryInstrument - IsLast: {is_last}")
         
-        if rsp_info:
-            error_id = rsp_info.ErrorID if hasattr(rsp_info, 'ErrorID') else 0
-            error_msg = rsp_info.ErrorMsg if hasattr(rsp_info, 'ErrorMsg') else ''
-            logger.info(f"[TdClient-回调] 响应信息 - ErrorID: {error_id}, ErrorMsg: {error_msg}")
-        else:
-            logger.warning(f"[TdClient-回调] rsp_info 为 None")
+        # 【新增】收集合约信息用于自动保存
+        if instrument_field and self._instrument_manager:
+            try:
+                from ..storage.instrument_manager import InstrumentInfo
+                
+                instrument_id = instrument_field.InstrumentID
+                
+                # 只收集期货合约，过滤期权
+                if InstrumentInfo.is_futures(instrument_id):
+                    # 创建合约信息对象（简化版）
+                    info = InstrumentInfo(
+                        instrument_id=instrument_id,
+                        exchange_id=instrument_field.ExchangeID,
+                        product_id=instrument_field.ProductID,
+                        volume_multiple=instrument_field.VolumeMultiple,
+                        price_tick=instrument_field.PriceTick
+                    )
+                    
+                    # 添加到临时缓存
+                    self._instruments_cache.append(info)
+                    
+                    # 每100个合约打印一次进度
+                    if len(self._instruments_cache) % 100 == 0:
+                        logger.info(f"已接收 {len(self._instruments_cache)} 个期货合约...")
+                
+            except Exception as e:
+                logger.error(f"解析合约信息失败: {e}")
         
-        if instrument_field:
-            instrument_id = instrument_field.InstrumentID if hasattr(instrument_field, 'InstrumentID') else 'Unknown'
-            volume_multiple = instrument_field.VolumeMultiple if hasattr(instrument_field, 'VolumeMultiple') else 'Unknown'
-            logger.info(f"[TdClient-回调] 合约数据 - InstrumentID: {instrument_id}, VolumeMultiple: {volume_multiple}")
-        else:
-            logger.warning(f"[TdClient-回调] instrument_field 为 None")
+        # 【新增】查询完成后保存到JSON文件
+        if is_last and self._instrument_manager and len(self._instruments_cache) > 0:
+            try:
+                logger.info(f"合约查询完成，共 {len(self._instruments_cache)} 个期货合约（已过滤期权）")
+                
+                # 更新合约管理器
+                self._instrument_manager.instruments = {
+                    inst.instrument_id: inst 
+                    for inst in self._instruments_cache
+                }
+                from datetime import datetime
+                self._instrument_manager.update_time = datetime.now()
+                
+                # 保存到JSON文件
+                self._instrument_manager.save_to_cache()
+                
+                # 清空临时缓存
+                self._instruments_cache = []
+                
+                logger.info("✅ 合约信息已自动保存到JSON文件")
+                
+            except Exception as e:
+                logger.error(f"保存合约信息失败: {e}", exc_info=True)
         
+        # 原有逻辑：构建响应并回调
         response = CTPObjectHelper.build_response_dict(Constant.OnRspQryInstrument, rsp_info, request_id, is_last)
         rsp_instrument = {}
         if instrument_field:

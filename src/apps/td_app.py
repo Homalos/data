@@ -23,6 +23,7 @@ from ..utils.metrics import MetricsCollector
 # 全局实例
 _cache_manager: Optional[CacheManager] = None
 _metrics_collector: Optional[MetricsCollector] = None
+_instrument_manager: Optional[Any] = None  # 新增：合约管理器
 _initialized: bool = False
 
 
@@ -34,9 +35,9 @@ async def startup_event():
     """
     应用启动事件处理器
     
-    初始化 CacheManager 和 MetricsCollector
+    初始化 CacheManager、MetricsCollector 和 InstrumentManager
     """
-    global _cache_manager, _metrics_collector, _initialized
+    global _cache_manager, _metrics_collector, _instrument_manager, _initialized
     
     if _initialized:
         return
@@ -71,6 +72,26 @@ async def startup_event():
         logger.warning(f"CacheManager 初始化失败，将在无缓存模式下运行: {e}")
         _cache_manager = None
     
+    # 【新增】初始化合约管理器
+    if hasattr(GlobalConfig, 'Storage') and GlobalConfig.Storage.enabled:
+        try:
+            from ..storage import InstrumentManager
+            
+            _instrument_manager = InstrumentManager(
+                cache_path=GlobalConfig.Storage.instruments.cache_path
+            )
+            # 尝试从缓存加载
+            if not _instrument_manager.load_from_cache():
+                logger.info("合约缓存不存在，将在登录后自动查询")
+            else:
+                logger.info(f"从缓存加载 {len(_instrument_manager.instruments)} 个合约")
+            
+        except Exception as e:
+            logger.warning(f"InstrumentManager 初始化失败: {e}")
+            _instrument_manager = None
+    else:
+        logger.info("存储服务未启用，合约管理器未初始化")
+    
     _initialized = True
     logger.info("交易服务初始化完成")
 
@@ -80,9 +101,9 @@ async def shutdown_event():
     """
     应用关闭事件处理器
     
-    清理 CacheManager 和 MetricsCollector 资源
+    清理 CacheManager、MetricsCollector 和 InstrumentManager 资源
     """
-    global _cache_manager, _metrics_collector, _initialized
+    global _cache_manager, _metrics_collector, _instrument_manager, _initialized
     
     logger.info("正在关闭交易服务...")
     
@@ -143,6 +164,10 @@ class TdConnectionWithMetrics(TdConnection):
         # 注入 MetricsCollector
         if _metrics_collector:
             client.set_metrics_collector(_metrics_collector)
+        
+        # 【新增】注入 InstrumentManager
+        if _instrument_manager:
+            client.set_instrument_manager(_instrument_manager)
         
         return client
     

@@ -39,6 +39,7 @@ class TdClient(BaseClient):
         self._user_id: Optional[str] = None
         self._metrics_collector: Optional[MetricsCollector] = None
         self._cache_queue: Queue = Queue()  # 缓存任务队列
+        self._instrument_manager: Optional[Any] = None  # 新增：合约管理器
 
     def set_cache_manager(self, cache_manager: CacheManager) -> None:
         """
@@ -59,6 +60,16 @@ class TdClient(BaseClient):
         """
         self._metrics_collector = metrics_collector
         logger.info("TdClient: MetricsCollector 已注入")
+
+    def set_instrument_manager(self, instrument_manager) -> None:
+        """
+        设置合约管理器实例
+
+        Args:
+            instrument_manager: InstrumentManager 实例，用于管理合约信息
+        """
+        self._instrument_manager = instrument_manager
+        logger.info("TdClient: InstrumentManager 已注入")
 
     def on_rsp_or_rtn(self, data: dict[str, Any]) -> None:
         """
@@ -151,6 +162,7 @@ class TdClient(BaseClient):
             }
 
         try:
+            # 直接验证整个请求数据（包含MsgType和RequestID）
             class_(**data)
         except Exception as err:
             return {
@@ -299,7 +311,14 @@ class TdClient(BaseClient):
         Returns:
             CTPTdClient: CTP交易客户端实例对象
         """
-        return CTPTdClient(user_id, password)
+        client = CTPTdClient(user_id, password)
+        
+        # 【新增】注入 InstrumentManager 到 CTP 客户端
+        if self._instrument_manager:
+            client.set_instrument_manager(self._instrument_manager)
+            logger.info("TdClient: InstrumentManager 已注入到 CTP 客户端")
+        
+        return client
 
     def _get_client_type(self) -> str:
         """
