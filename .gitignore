@@ -18,3 +18,5 @@ con_file
 .env
 .env.local
 .env.*.local
+logs
+logs/
