@@ -1,7 +1,7 @@
-# TdFrontAddress: tcp://182.254.243.31:40001 # 7x24交易前置地址
-# MdFrontAddress: tcp://182.254.243.31:40011 # 7x24行情前置地址
-TdFrontAddress: tcp://182.254.243.31:30001 # 交易前置地址
-MdFrontAddress: tcp://182.254.243.31:30012 # 行情前置地址
+TdFrontAddress: tcp://182.254.243.31:40001 # 7x24交易前置地址
+MdFrontAddress: tcp://182.254.243.31:40011 # 7x24行情前置地址
+# TdFrontAddress: tcp://182.254.243.31:30001 # 交易前置地址
+# MdFrontAddress: tcp://182.254.243.31:30012 # 行情前置地址
 BrokerID: "9999"
 AuthCode: "0000000000000000"
 AppID: simnow_client_test
@@ -10,3 +10,27 @@ Host: 127.0.0.1      # the bind ip address, default 127.0.0.1
 LogLevel: INFO     # NOTSET, DEBUG, INFO, WARN, ERROR, CRITICAL
 HeartbeatInterval: 30.0  # WebSocket heartbeat interval in seconds, default 30.0
 HeartbeatTimeout: 60.0   # WebSocket heartbeat timeout in seconds, default 60.0
+
+
+# 存储配置
+Storage:
+  Enabled: true
+  
+  # InfluxDB 3.x 配置
+  InfluxDB:
+    Host: http://localhost:8181
+    Token: apiv3_ml78EtzEVhJV4478mH4DMVPKpXCxskkODLUVkB7ENXkft9wKGz-1p4esG7lNLn5m3PCqSk1rbSeuL1A_Hnrt7g
+    Database: tick_data
+    BatchSize: 1000
+    FlushInterval: 5
+  
+  # 合约管理配置
+  Instruments:
+    CachePath: ./data/instruments.json
+    AutoUpdate: true
+    UpdateInterval: 86400  # 每天更新一次（秒）
+  
+  # K线配置
+  KLine:
+    Enabled: true
+    Periods: ["1m", "3m", "5m", "10m", "15m", "30m", "60m", "1d"]
