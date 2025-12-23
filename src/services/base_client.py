@@ -106,9 +106,12 @@ class BaseClient(ABC):
         """
         async with self._client_lock:
             if not self._client:
-                # 获取当前event loop并保存
+                # 获取当前event loop并保存到子类（如果支持）
                 try:
                     current_loop = asyncio.get_running_loop()
+                    # 保存到子类实例（MdClient/TdClient）
+                    if hasattr(self, '_event_loop'):
+                        self._event_loop = current_loop
                 except RuntimeError:
                     current_loop = None
                 
@@ -116,7 +119,7 @@ class BaseClient(ABC):
                     self._create_ctp_client, user_id, password
                 )
                 
-                # 如果子类需要event loop，在这里注入
+                # 如果子类需要event loop，在这里注入到CTP客户端
                 if current_loop and hasattr(self._client, 'set_event_loop'):
                     self._client.set_event_loop(current_loop)
                 
