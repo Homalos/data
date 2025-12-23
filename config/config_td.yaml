@@ -10,3 +10,14 @@ Host: 127.0.0.1      # the bind ip address, default 127.0.0.1
 LogLevel: INFO     # NOTSET, DEBUG, INFO, WARN, ERROR, CRITICAL
 HeartbeatInterval: 30.0  # WebSocket heartbeat interval in seconds, default 30.0
 HeartbeatTimeout: 60.0   # WebSocket heartbeat timeout in seconds, default 60.0
+
+# 存储配置
+Storage:
+  Enabled: true
+  Instruments:
+    CachePath: data/instruments.json
+
+# 测试配置
+Test:
+  SubscribeLimit: 10  # 订阅合约数量，0表示订阅所有
+  ListenDuration: 60  # 监听时长（秒）
