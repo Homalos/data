@@ -86,15 +86,6 @@ class MetricsConfig:
 
 
 @dataclass
-class StrategyConfig:
-    """策略管理配置"""
-
-    max_strategies: int = 10  # 最大策略数量
-    default_max_memory_mb: int = 512  # 默认单策略最大内存（MB）
-    default_max_cpu_percent: float = 50.0  # 默认单策略最大CPU使用率（%）
-
-
-@dataclass
 class AlertsConfig:
     """告警配置"""
 
@@ -184,7 +175,6 @@ class GlobalConfig(object):
     # 新增配置对象
     Cache: CacheConfig
     Metrics: MetricsConfig
-    Strategy: StrategyConfig
     Alerts: AlertsConfig
     SyncApi: SyncApiConfig
     Storage: StorageConfig
@@ -212,7 +202,6 @@ class GlobalConfig(object):
             ConFilePath: 连接文件路径，默认'./con_file/'
             Cache: Redis 缓存配置
             Metrics: 性能监控配置
-            Strategy: 策略管理配置
         """
         with open(config_file_path, encoding="utf-8") as f:
             config = yaml.safe_load(f)
@@ -323,18 +312,6 @@ class GlobalConfig(object):
                         "WEBCTP_METRICS_MEMORY_WARNING_THRESHOLD",
                         metrics_config.get("MemoryWarningThreshold", 80.0),
                     )
-                ),
-            )
-
-            # 加载策略管理配置（可选）
-            strategy_config = config.get("Strategy", {})
-            cls.Strategy = StrategyConfig(
-                max_strategies=int(strategy_config.get("MaxStrategies", 10)),
-                default_max_memory_mb=int(
-                    strategy_config.get("DefaultMaxMemoryMB", 512)
-                ),
-                default_max_cpu_percent=float(
-                    strategy_config.get("DefaultMaxCPUPercent", 50.0)
                 ),
             )
 
