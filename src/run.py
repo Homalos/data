@@ -44,10 +44,10 @@ async def run(config_file_path: str, app_type: str):
     app: str = ""
     if app_type == "td":
         logger.info("start td app")
-        app = "src.apps:td_app"
+        app = "src.apps.td_app:app"
     elif app_type == "md":
         logger.info("start md app")
-        app = "src.apps:md_app"
+        app = "src.apps.md_app:app"
     elif app_type == "dev":
         logger.info("start dev app")
         app = "src.apps:dev_app"
