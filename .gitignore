@@ -12,3 +12,4 @@ wheels/
 .idea
 .git
 con_file
+.pytest_cache
