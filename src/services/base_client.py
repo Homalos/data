@@ -9,6 +9,7 @@
 @Software   : PyCharm
 @Description: 客户端基类 (抽象类)
 """
+import asyncio
 import logging
 import uuid
 from abc import ABC, abstractmethod
@@ -105,9 +106,20 @@ class BaseClient(ABC):
         """
         async with self._client_lock:
             if not self._client:
+                # 获取当前event loop并保存
+                try:
+                    current_loop = asyncio.get_running_loop()
+                except RuntimeError:
+                    current_loop = None
+                
                 self._client = await anyio.to_thread.run_sync(
                     self._create_ctp_client, user_id, password
                 )
+                
+                # 如果子类需要event loop，在这里注入
+                if current_loop and hasattr(self._client, 'set_event_loop'):
+                    self._client.set_event_loop(current_loop)
+                
                 self._client.rsp_callback = self.on_rsp_or_rtn
                 self._init_call_map()
                 if not self._task_group:
