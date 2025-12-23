@@ -25,6 +25,10 @@ from ..utils.metrics import MetricsCollector
 _cache_manager: Optional[CacheManager] = None
 _metrics_collector: Optional[MetricsCollector] = None
 _strategy_manager: Optional[StrategyManager] = None
+_tick_storage: Optional[Any] = None  # 新增：Tick存储
+_instrument_manager: Optional[Any] = None  # 新增：合约管理器
+_kline_builder: Optional[Any] = None  # 新增：K线合成器
+_kline_storage: Optional[Any] = None  # 新增：K线存储
 _initialized: bool = False
 
 
@@ -36,9 +40,9 @@ async def startup_event():
     """
     应用启动事件处理器
     
-    初始化 CacheManager、MetricsCollector 和 StrategyManager
+    初始化 CacheManager、MetricsCollector、StrategyManager 和存储服务
     """
-    global _cache_manager, _metrics_collector, _strategy_manager, _initialized
+    global _cache_manager, _metrics_collector, _strategy_manager, _tick_storage, _instrument_manager, _kline_builder, _kline_storage, _initialized
     
     if _initialized:
         return
@@ -84,6 +88,50 @@ async def startup_event():
         logger.warning(f"StrategyManager 初始化失败: {e}")
         _strategy_manager = None
     
+    # 【新增】初始化存储服务
+    if hasattr(GlobalConfig, 'Storage') and GlobalConfig.Storage.enabled:
+        try:
+            from ..storage import InstrumentManager, TickStorage, KLineBuilder, KLineStorage
+            
+            # 初始化合约管理器
+            _instrument_manager = InstrumentManager(
+                cache_path=GlobalConfig.Storage.instruments.cache_path
+            )
+            # 尝试从缓存加载
+            if not _instrument_manager.load_from_cache():
+                logger.info("合约缓存不存在，将在首次连接后查询")
+            else:
+                logger.info(f"从缓存加载 {len(_instrument_manager.instruments)} 个合约")
+            
+            # 初始化Tick存储
+            _tick_storage = TickStorage(GlobalConfig.Storage.influxdb)
+            await _tick_storage.initialize()
+            logger.info("Tick存储引擎初始化成功")
+            
+            # 初始化K线存储
+            if GlobalConfig.Storage.kline.enabled:
+                _kline_storage = KLineStorage(GlobalConfig.Storage.influxdb)
+                await _kline_storage.initialize()
+                logger.info("K线存储引擎初始化成功")
+                
+                # 初始化K线合成器
+                _kline_builder = KLineBuilder(
+                    kline_storage=_kline_storage,
+                    enabled_periods=GlobalConfig.Storage.kline.periods
+                )
+                logger.info("K线合成器初始化成功")
+            else:
+                logger.info("K线合成未启用")
+            
+        except Exception as e:
+            logger.error(f"存储服务初始化失败: {e}", exc_info=True)
+            _tick_storage = None
+            _instrument_manager = None
+            _kline_builder = None
+            _kline_storage = None
+    else:
+        logger.info("存储服务未启用")
+    
     _initialized = True
     logger.info("行情服务初始化完成")
 
@@ -93,9 +141,9 @@ async def shutdown_event():
     """
     应用关闭事件处理器
     
-    清理 CacheManager、MetricsCollector 和 StrategyManager 资源
+    清理 CacheManager、MetricsCollector、StrategyManager 和存储服务资源
     """
-    global _cache_manager, _metrics_collector, _strategy_manager, _initialized
+    global _cache_manager, _metrics_collector, _strategy_manager, _tick_storage, _kline_builder, _kline_storage, _initialized
     
     logger.info("正在关闭行情服务...")
     
@@ -110,6 +158,28 @@ async def shutdown_event():
             logger.info("所有策略已停止")
         except Exception as e:
             logger.error(f"停止策略失败: {e}")
+    
+    # 【新增】关闭存储服务
+    if _kline_builder:
+        try:
+            await _kline_builder.close()
+            logger.info("K线合成器已关闭")
+        except Exception as e:
+            logger.error(f"关闭K线合成器失败: {e}")
+    
+    if _kline_storage:
+        try:
+            await _kline_storage.close()
+            logger.info("K线存储引擎已关闭")
+        except Exception as e:
+            logger.error(f"关闭K线存储失败: {e}")
+    
+    if _tick_storage:
+        try:
+            await _tick_storage.close()
+            logger.info("Tick存储引擎已关闭")
+        except Exception as e:
+            logger.error(f"关闭Tick存储失败: {e}")
     
     # 停止 MetricsCollector
     if _metrics_collector:
@@ -172,6 +242,16 @@ class MdConnectionWithMetrics(MdConnection):
         # 注入 StrategyManager
         if _strategy_manager:
             client.set_strategy_manager(_strategy_manager)
+        
+        # 【新增】注入存储服务
+        if _tick_storage:
+            client.set_tick_storage(_tick_storage)
+        
+        if _instrument_manager:
+            client.set_instrument_manager(_instrument_manager)
+        
+        if _kline_builder:
+            client.set_kline_builder(_kline_builder)
         
         return client
     
