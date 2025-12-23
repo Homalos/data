@@ -39,6 +39,12 @@ class MdClient(BaseClient):
         self._metrics_collector: Optional[MetricsCollector] = None
         self._strategy_manager: Optional[Any] = None  # 避免循环导入
         self._serializer = get_msgpack_serializer()
+        # 存储相关（新增）
+        self._tick_storage: Optional[Any] = None
+        self._instrument_manager: Optional[Any] = None
+        self._kline_builder: Optional[Any] = None
+        # Event loop引用（用于从同步上下文调度异步任务）
+        self._event_loop: Optional[asyncio.AbstractEventLoop] = None
 
     def set_cache_manager(self, cache_manager: CacheManager) -> None:
         """
@@ -69,6 +75,42 @@ class MdClient(BaseClient):
         """
         self._strategy_manager = strategy_manager
         logger.info("MdClient 已注入 StrategyManager")
+    
+    def set_tick_storage(self, tick_storage: Any) -> None:
+        """
+        设置Tick存储引擎
+
+        Args:
+            tick_storage: TickStorage 实例，用于存储tick数据
+        """
+        self._tick_storage = tick_storage
+        if self._client:
+            self._client.set_tick_storage(tick_storage)
+        logger.info("MdClient 已注入 TickStorage")
+    
+    def set_instrument_manager(self, instrument_manager: Any) -> None:
+        """
+        设置合约管理器
+
+        Args:
+            instrument_manager: InstrumentManager 实例，用于管理合约信息
+        """
+        self._instrument_manager = instrument_manager
+        if self._client:
+            self._client.set_instrument_manager(instrument_manager)
+        logger.info("MdClient 已注入 InstrumentManager")
+    
+    def set_kline_builder(self, kline_builder: Any) -> None:
+        """
+        设置K线合成器
+
+        Args:
+            kline_builder: KLineBuilder 实例，用于合成K线
+        """
+        self._kline_builder = kline_builder
+        if self._client:
+            self._client.set_kline_builder(kline_builder)
+        logger.info("MdClient 已注入 KLineBuilder")
 
     async def call(self, request: dict[str, Any]) -> None:
         """
@@ -140,7 +182,17 @@ class MdClient(BaseClient):
         Returns:
             CTPMdClient: CTP行情客户端实例
         """
-        return CTPMdClient(user_id, password)
+        client = CTPMdClient(user_id, password)
+        
+        # 注入存储服务到CTP客户端
+        if self._tick_storage:
+            client.set_tick_storage(self._tick_storage)
+        if self._instrument_manager:
+            client.set_instrument_manager(self._instrument_manager)
+        if self._kline_builder:
+            client.set_kline_builder(self._kline_builder)
+        
+        return client
 
     def _get_client_type(self) -> str:
         """
@@ -191,14 +243,21 @@ class MdClient(BaseClient):
                 # 记录分发开始时间
                 broadcast_start_time = time.time()
                 
+                # 获取event loop（如果存在）
+                try:
+                    loop = self._event_loop or asyncio.get_running_loop()
+                except RuntimeError:
+                    loop = None
+                
                 # 1. Redis 快照缓存操作（不包含 Pub/Sub）
-                if self._cache_manager and self._cache_manager.is_available():
+                if self._cache_manager and self._cache_manager.is_available() and loop:
                     try:
                         instrument_id = market_data.get("InstrumentID")
                         if instrument_id:
-                            # 异步执行 Redis 快照缓存（不阻塞主流程）
-                            asyncio.create_task(
-                                self._cache_market_snapshot(instrument_id, market_data)
+                            # 使用run_coroutine_threadsafe从同步上下文调度异步任务
+                            asyncio.run_coroutine_threadsafe(
+                                self._cache_market_snapshot(instrument_id, market_data),
+                                loop
                             )
                     except Exception as e:
                         # Redis 操作失败不影响核心推送功能
@@ -206,11 +265,12 @@ class MdClient(BaseClient):
                 
                 # 2. 通过 StrategyManager 广播行情到所有订阅策略
                 # StrategyManager 内部会处理 Redis Pub/Sub 发布
-                if self._strategy_manager:
+                if self._strategy_manager and loop:
                     try:
-                        # 异步广播行情数据（不阻塞主流程）
-                        asyncio.create_task(
-                            self._broadcast_with_metrics(market_data, broadcast_start_time)
+                        # 使用run_coroutine_threadsafe从同步上下文调度异步任务
+                        asyncio.run_coroutine_threadsafe(
+                            self._broadcast_with_metrics(market_data, broadcast_start_time),
+                            loop
                         )
                     except Exception as e:
                         logger.warning(f"广播行情到策略管理器失败: {e}")
