@@ -301,7 +301,7 @@ class TdClient(BaseClient):
         
         logging.debug(f"{self._get_client_type()} client stopped")
 
-    def _create_ctp_client(self, user_id: str, password: str):
+    def _create_ctp_client(self, user_id: str, password: str) -> CTPTdClient:
         """创建CTP交易客户端实例
 
         Args:
