@@ -10,6 +10,7 @@ from .kline_builder import KLineBuilder
 
 # CSV存储引擎
 from .csv_tick_storage import CSVTickStorage
+from .csv_kline_storage import CSVKLineStorage
 
 __all__ = [
     "InstrumentManager",
@@ -17,5 +18,6 @@ __all__ = [
     "KLineBar",
     "KLineBuilder",
     "CSVTickStorage",
+    "CSVKLineStorage",
 ]
 

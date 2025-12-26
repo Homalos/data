@@ -3,9 +3,9 @@
 """
 K线合成器 - 实时合成多周期K线
 """
-import asyncio
-from typing import Dict, Optional, List
 from datetime import datetime, timedelta
+from typing import Dict, Optional, List
+
 from loguru import logger
 
 from .kline_period import KLinePeriod, KLineBar
