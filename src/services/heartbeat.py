@@ -48,6 +48,16 @@ class HeartbeatManager:
         async def heartbeat_loop():
             while self.is_running:
                 try:
+                    # 检查超时（在发送前检查）
+                    if self.is_timeout():
+                        logger.warning(f"Heartbeat timeout ({self.timeout}s), disconnecting...")
+                        self.is_running = False
+                        try:
+                            await disconnect_callback()
+                        except Exception:
+                            pass  # 忽略断开连接时的错误
+                        break
+                    
                     # 发送 Ping
                     await send_callback({
                         "MsgType": "Ping",
@@ -57,18 +67,17 @@ class HeartbeatManager:
                     
                     # 等待心跳间隔
                     await asyncio.sleep(self.interval)
-                    
-                    # 检查超时
-                    if self.is_timeout():
-                        logger.warning(f"Heartbeat timeout ({self.timeout}s), disconnecting...")
-                        await disconnect_callback()
-                        break
                         
                 except asyncio.CancelledError:
                     logger.debug("Heartbeat task cancelled")
                     break
                 except Exception as e:
-                    logger.error(f"Heartbeat error: {e}")
+                    # 连接已关闭，静默退出
+                    if "websocket.close" in str(e) or "response already completed" in str(e):
+                        logger.debug("Connection closed, stopping heartbeat")
+                    else:
+                        logger.error(f"Heartbeat error: {e}")
+                    self.is_running = False
                     break
         
         self._task = asyncio.create_task(heartbeat_loop())

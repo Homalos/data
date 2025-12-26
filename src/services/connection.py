@@ -60,9 +60,14 @@ class BaseConnection(abc.ABC):
         Returns:
             None: 此方法不返回任何值
         """
+        # 先停止心跳，避免在连接关闭后继续发送
         if self._heartbeat:
             await self._heartbeat.stop()
-        await self._client.stop()
+            self._heartbeat = None
+        
+        # 再停止客户端
+        if self._client:
+            await self._client.stop()
 
     async def send(self, data: dict[str, Any]) -> None:
         """

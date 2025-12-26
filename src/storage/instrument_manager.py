@@ -226,16 +226,31 @@ class InstrumentManager:
             
             # 解析合约信息
             self.instruments = {}
-            for inst_dict in cache_data.get("instruments", []):
-                # 兼容旧格式和新格式
-                info = InstrumentInfo(
-                    instrument_id=inst_dict["instrument_id"],
-                    exchange_id=inst_dict["exchange_id"],
-                    product_id=inst_dict["product_id"],
-                    volume_multiple=inst_dict["volume_multiple"],
-                    price_tick=inst_dict["price_tick"]
-                )
-                self.instruments[info.instrument_id] = info
+            instruments_data = cache_data.get("instruments", {})
+            
+            # 兼容两种格式：字典格式（新）和列表格式（旧）
+            if isinstance(instruments_data, dict):
+                # 新格式：字典 {instrument_id: {...}}
+                for instrument_id, inst_dict in instruments_data.items():
+                    info = InstrumentInfo(
+                        instrument_id=inst_dict["instrument_id"],
+                        exchange_id=inst_dict["exchange_id"],
+                        product_id=inst_dict["product_id"],
+                        volume_multiple=inst_dict["volume_multiple"],
+                        price_tick=inst_dict["price_tick"]
+                    )
+                    self.instruments[info.instrument_id] = info
+            elif isinstance(instruments_data, list):
+                # 旧格式：列表 [{...}, {...}]
+                for inst_dict in instruments_data:
+                    info = InstrumentInfo(
+                        instrument_id=inst_dict["instrument_id"],
+                        exchange_id=inst_dict["exchange_id"],
+                        product_id=inst_dict["product_id"],
+                        volume_multiple=inst_dict["volume_multiple"],
+                        price_tick=inst_dict["price_tick"]
+                    )
+                    self.instruments[info.instrument_id] = info
             
             # 解析更新时间
             update_time_str = cache_data.get("update_time")
