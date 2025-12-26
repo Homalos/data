@@ -3,11 +3,12 @@
 """
 测试K线合成模块
 """
+from datetime import datetime
+
 import pytest
-import asyncio
-from datetime import datetime, timedelta
-from src.storage.kline_period import KLinePeriod, KLineBar
+
 from src.storage.kline_builder import KLineBuilder
+from src.storage.kline_period import KLinePeriod, KLineBar
 
 
 class MockKLineStorage:
