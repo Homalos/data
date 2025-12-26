@@ -2,7 +2,7 @@
 
 ## 概述
 
-homalos-webctp 项目使用基于 `loguru` 的日志工具类 `Logger`，提供强大的日志记录功能。
+homalos-data 项目使用基于 `loguru` 的日志工具类 `Logger`，提供强大的日志记录功能。
 
 ### 主要特性
 
@@ -69,6 +69,42 @@ logger.info("普通信息", tag="auth")
 logger.error("错误信息", tag="database")
 logger.success("成功信息", tag="payment")
 ```
+
+### 使用类级别默认 Tag（推荐）
+
+在类中设置默认 tag，避免每次都传入 tag 参数：
+
+```python
+from utils import logger
+
+class PaymentService:
+    """支付服务"""
+    
+    def __init__(self):
+        # 设置类级别的默认 tag
+        logger.set_default_tag("payment")
+        logger.info("支付服务初始化")
+    
+    def process_payment(self, order_id: str):
+        # 不需要传入 tag，自动使用 "payment"
+        logger.info(f"开始处理支付: {order_id}")
+        logger.debug("验证订单")
+        logger.success("支付成功")
+    
+    def __del__(self):
+        # 清理时清除默认 tag
+        logger.clear_default_tag()
+```
+
+**输出：**
+```
+INFO     | [payment] 支付服务初始化
+INFO     | [payment] 开始处理支付: ORD-123
+DEBUG    | [payment] 验证订单
+SUCCESS  | [payment] 支付成功
+```
+
+**详细文档**: 参见 [Logger 默认 Tag 使用指南](logger_default_tag_guide.md)
 
 ### 使用 Trace ID
 

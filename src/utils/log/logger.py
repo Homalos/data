@@ -138,7 +138,7 @@ class Logger:
         return _trace_id_context.get()
     
     @staticmethod
-    def generate_trace_id() -> str:
+    def _generate_trace_id() -> str:
         """
         生成唯一的 trace_id
         
@@ -161,7 +161,7 @@ class Logger:
             设置的 trace_id
         """
         if trace_id is None:
-            trace_id = Logger.generate_trace_id()
+            trace_id = Logger._generate_trace_id()
         _trace_id_context.set(trace_id)
         return trace_id
     
@@ -174,6 +174,26 @@ class Logger:
     def get_trace_id() -> Optional[str]:
         """获取当前的 trace_id"""
         return Logger._get_trace_id()
+    
+    @staticmethod
+    def set_default_tag(tag: Optional[str] = None) -> None:
+        """
+        设置默认 tag，用于类级别的日志标签
+        
+        Args:
+            tag: 默认标签，如果为 None 则清除默认标签
+        """
+        _default_tag_context.set(tag)
+    
+    @staticmethod
+    def clear_default_tag() -> None:
+        """清除默认 tag"""
+        _default_tag_context.set(None)
+    
+    @staticmethod
+    def get_default_tag() -> Optional[str]:
+        """获取当前的默认 tag"""
+        return _default_tag_context.get()
     
     def _log_with_trace(self, message: str, tag: Optional[str], trace_id, log_func, **kwargs) -> None:
         """
@@ -189,7 +209,7 @@ class Logger:
         # 处理 trace_id 参数
         if trace_id is True:
             # 自动生成 UUID
-            trace_id = self.generate_trace_id()
+            trace_id = self._generate_trace_id()
         
         # 如果指定了 trace_id，临时设置
         if trace_id:
@@ -228,9 +248,10 @@ class Logger:
         if trace_id:
             parts.append(f"[trace_id={trace_id}]")
         
-        # 添加标签（如果指定）
-        if tag:
-            parts.append(f"[{tag}]")
+        # 添加标签（优先使用传入的tag，否则使用默认tag）
+        final_tag = tag if tag is not None else _default_tag_context.get()
+        if final_tag:
+            parts.append(f"[{final_tag}]")
         
         # 添加消息
         parts.append(message)
