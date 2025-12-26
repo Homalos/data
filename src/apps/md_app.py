@@ -23,10 +23,6 @@ from ..utils.metrics import MetricsCollector
 # 全局实例
 _cache_manager: Optional[CacheManager] = None
 _metrics_collector: Optional[MetricsCollector] = None
-_tick_storage: Optional[Any] = None  # 新增：Tick存储
-_instrument_manager: Optional[Any] = None  # 新增：合约管理器
-_kline_builder: Optional[Any] = None  # 新增：K线合成器
-_kline_storage: Optional[Any] = None  # 新增：K线存储
 _initialized: bool = False
 
 
@@ -38,9 +34,9 @@ async def startup_event():
     """
     应用启动事件处理器
     
-    初始化 CacheManager、MetricsCollector 和存储服务
+    初始化 CacheManager 和 MetricsCollector
     """
-    global _cache_manager, _metrics_collector, _tick_storage, _instrument_manager, _kline_builder, _kline_storage, _initialized
+    global _cache_manager, _metrics_collector, _initialized
     
     if _initialized:
         return
@@ -75,43 +71,6 @@ async def startup_event():
         logger.warning(f"CacheManager 初始化失败，将在无缓存模式下运行: {e}")
         _cache_manager = None
     
-    # 【新增】初始化存储服务
-    if hasattr(GlobalConfig, 'Storage') and GlobalConfig.Storage.enabled:
-        try:
-            from ..storage import InstrumentManager
-            from ..storage.csv_tick_storage import CSVTickStorage
-            
-            logger.info("使用CSV存储引擎")
-            
-            # 初始化合约管理器
-            _instrument_manager = InstrumentManager(
-                cache_path=GlobalConfig.Storage.instruments.cache_path
-            )
-            if not _instrument_manager.load_from_cache():
-                logger.info("合约缓存不存在，将在首次连接后查询")
-            else:
-                logger.info(f"从缓存加载 {len(_instrument_manager.instruments)} 个合约")
-            
-            # 初始化CSV存储
-            csv_config = GlobalConfig.Storage.csv
-            _tick_storage = CSVTickStorage(
-                base_path=csv_config.base_path
-            )
-            await _tick_storage.initialize()
-            logger.info("CSV Tick存储引擎初始化成功")
-            
-            # K线功能不支持CSV存储
-            logger.info("CSV存储模式下不支持K线合成")
-            
-        except Exception as e:
-            logger.error(f"存储服务初始化失败: {e}", exc_info=True)
-            _tick_storage = None
-            _instrument_manager = None
-            _kline_builder = None
-            _kline_storage = None
-    else:
-        logger.info("存储服务未启用")
-    
     _initialized = True
     logger.info("行情服务初始化完成")
 
@@ -121,33 +80,11 @@ async def shutdown_event():
     """
     应用关闭事件处理器
     
-    清理 CacheManager、MetricsCollector 和存储服务资源
+    清理 CacheManager 和 MetricsCollector 资源
     """
-    global _cache_manager, _metrics_collector, _tick_storage, _kline_builder, _kline_storage, _initialized
+    global _cache_manager, _metrics_collector, _initialized
     
     logger.info("正在关闭行情服务...")
-    
-    # 【新增】关闭存储服务
-    if _kline_builder:
-        try:
-            await _kline_builder.close()
-            logger.info("K线合成器已关闭")
-        except Exception as e:
-            logger.error(f"关闭K线合成器失败: {e}")
-    
-    if _kline_storage:
-        try:
-            await _kline_storage.close()
-            logger.info("K线存储引擎已关闭")
-        except Exception as e:
-            logger.error(f"关闭K线存储失败: {e}")
-    
-    if _tick_storage:
-        try:
-            await _tick_storage.close()
-            logger.info("Tick存储引擎已关闭")
-        except Exception as e:
-            logger.error(f"关闭Tick存储失败: {e}")
     
     # 停止 MetricsCollector
     if _metrics_collector:
@@ -206,16 +143,6 @@ class MdConnectionWithMetrics(MdConnection):
         # 注入 MetricsCollector
         if _metrics_collector:
             client.set_metrics_collector(_metrics_collector)
-        
-        # 【新增】注入存储服务
-        if _tick_storage:
-            client.set_tick_storage(_tick_storage)
-        
-        if _instrument_manager:
-            client.set_instrument_manager(_instrument_manager)
-        
-        if _kline_builder:
-            client.set_kline_builder(_kline_builder)
         
         return client
     
