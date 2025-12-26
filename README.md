@@ -36,6 +36,7 @@ homalos-data/
 ### 1. 安装依赖
 
 ```bash
+.venv\Scripts\activate
 uv sync
 ```
 
