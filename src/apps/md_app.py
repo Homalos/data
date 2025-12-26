@@ -78,37 +78,30 @@ async def startup_event():
     # 【新增】初始化存储服务
     if hasattr(GlobalConfig, 'Storage') and GlobalConfig.Storage.enabled:
         try:
-            from ..storage import InstrumentManager, TickStorage, KLineBuilder, KLineStorage
+            from ..storage import InstrumentManager
+            from ..storage.csv_tick_storage import CSVTickStorage
+            
+            logger.info("使用CSV存储引擎")
             
             # 初始化合约管理器
             _instrument_manager = InstrumentManager(
                 cache_path=GlobalConfig.Storage.instruments.cache_path
             )
-            # 尝试从缓存加载
             if not _instrument_manager.load_from_cache():
                 logger.info("合约缓存不存在，将在首次连接后查询")
             else:
                 logger.info(f"从缓存加载 {len(_instrument_manager.instruments)} 个合约")
             
-            # 初始化Tick存储
-            _tick_storage = TickStorage(GlobalConfig.Storage.influxdb)
+            # 初始化CSV存储
+            csv_config = GlobalConfig.Storage.csv
+            _tick_storage = CSVTickStorage(
+                base_path=csv_config.base_path
+            )
             await _tick_storage.initialize()
-            logger.info("Tick存储引擎初始化成功")
+            logger.info("CSV Tick存储引擎初始化成功")
             
-            # 初始化K线存储
-            if GlobalConfig.Storage.kline.enabled:
-                _kline_storage = KLineStorage(GlobalConfig.Storage.influxdb)
-                await _kline_storage.initialize()
-                logger.info("K线存储引擎初始化成功")
-                
-                # 初始化K线合成器
-                _kline_builder = KLineBuilder(
-                    kline_storage=_kline_storage,
-                    enabled_periods=GlobalConfig.Storage.kline.periods
-                )
-                logger.info("K线合成器初始化成功")
-            else:
-                logger.info("K线合成未启用")
+            # K线功能不支持CSV存储
+            logger.info("CSV存储模式下不支持K线合成")
             
         except Exception as e:
             logger.error(f"存储服务初始化失败: {e}", exc_info=True)

@@ -41,10 +41,10 @@ class KLinePeriod(Enum):
     @property
     def measurement_name(self) -> str:
         """
-        获取InfluxDB measurement名称
+        获取K线表名称
         
         Returns:
-            measurement名称，如 "kline_1m"
+            表名称，如 "kline_1m"
         """
         return f"kline_{self.value}"
     

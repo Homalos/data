@@ -1,7 +1,7 @@
-TdFrontAddress: tcp://182.254.243.31:40001 # 7x24交易前置地址
-MdFrontAddress: tcp://182.254.243.31:40011 # 7x24行情前置地址
-# TdFrontAddress: tcp://182.254.243.31:30001 # 交易前置地址
-# MdFrontAddress: tcp://182.254.243.31:30012 # 行情前置地址
+# TdFrontAddress: tcp://182.254.243.31:40001 # 7x24交易前置地址
+# MdFrontAddress: tcp://182.254.243.31:40011 # 7x24行情前置地址
+TdFrontAddress: tcp://182.254.243.31:30001 # 交易前置地址
+MdFrontAddress: tcp://182.254.243.31:30012 # 行情前置地址
 BrokerID: "9999"
 AuthCode: "0000000000000000"
 AppID: simnow_client_test
@@ -19,5 +19,5 @@ Storage:
 
 # 测试配置
 Test:
-  SubscribeLimit: 10  # 订阅合约数量，0表示订阅所有
-  ListenDuration: 60  # 监听时长（秒）
+  SubscribeLimit: 50  # 订阅合约数量，0表示订阅所有
+  ListenDuration: 0   # 监听时长（秒），0表示持续监听直到Ctrl+C

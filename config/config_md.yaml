@@ -1,7 +1,7 @@
-TdFrontAddress: tcp://182.254.243.31:40001 # 7x24交易前置地址
-MdFrontAddress: tcp://182.254.243.31:40011 # 7x24行情前置地址
-# TdFrontAddress: tcp://182.254.243.31:30001 # 交易前置地址
-# MdFrontAddress: tcp://182.254.243.31:30012 # 行情前置地址
+# TdFrontAddress: tcp://182.254.243.31:40001 # 7x24交易前置地址
+# MdFrontAddress: tcp://182.254.243.31:40011 # 7x24行情前置地址
+TdFrontAddress: tcp://182.254.243.31:30001 # 交易前置地址
+MdFrontAddress: tcp://182.254.243.31:30012 # 行情前置地址
 BrokerID: "9999"
 AuthCode: "0000000000000000"
 AppID: simnow_client_test
@@ -13,15 +13,7 @@ HeartbeatTimeout: 60.0   # WebSocket heartbeat timeout in seconds, default 60.0
 
 # 存储配置
 Storage:
-  Enabled: true
-  
-  # InfluxDB 3.x 配置
-  InfluxDB:
-    Host: http://localhost:8181
-    Token: apiv3_ml78EtzEVhJV4478mH4DMVPKpXCxskkODLUVkB7ENXkft9wKGz-1p4esG7lNLn5m3PCqSk1rbSeuL1A_Hnrt7g
-    Database: tick_data
-    BatchSize: 1000
-    FlushInterval: 5
+  Enabled: false
   
   # 合约管理配置
   Instruments:
@@ -31,10 +23,10 @@ Storage:
   
   # K线配置
   KLine:
-    Enabled: true
+    Enabled: false
     Periods: ["1m", "3m", "5m", "10m", "15m", "30m", "60m", "1d"]
 
 # 测试配置
 Test:
-  SubscribeLimit: 10  # 订阅合约数量，0表示订阅所有
-  ListenDuration: 60  # 监听时长（秒）
+  SubscribeLimit: 50  # 订阅合约数量，0表示订阅所有
+  ListenDuration: 0   # 监听时长（秒），0表示持续监听直到Ctrl+C

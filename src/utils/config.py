@@ -123,13 +123,23 @@ class SyncApiConfig:
 
 
 @dataclass
-class InfluxDBConfig:
-    """InfluxDB 3.x 配置"""
-    host: str = "http://localhost:8181"
-    token: str = ""
+class QuestDBConfig:
+    """QuestDB 配置"""
+    host: str = "localhost"
+    http_port: int = 9000
+    ilp_port: int = 9009
     database: str = "tick_data"
-    batch_size: int = 1000
-    flush_interval: float = 5.0
+    batch_size: int = 100
+    flush_interval: float = 0.1
+    max_retries: int = 3
+    
+    # 表配置
+    table_prefix_tick: str = "tick_"
+    table_prefix_kline: str = "kline_"
+    
+    # 分区配置
+    partition_tick: str = "DAY"
+    partition_kline: str = "MONTH"
 
 
 @dataclass
@@ -153,7 +163,7 @@ class KLineConfig:
 class StorageConfig:
     """存储配置"""
     enabled: bool = False
-    influxdb: InfluxDBConfig = field(default_factory=InfluxDBConfig)
+    questdb: QuestDBConfig = field(default_factory=QuestDBConfig)
     instruments: InstrumentsConfig = field(default_factory=InstrumentsConfig)
     kline: KLineConfig = field(default_factory=KLineConfig)
 
@@ -367,18 +377,28 @@ class GlobalConfig(object):
 
             # 加载存储配置（可选）
             storage_config = config.get("Storage", {})
-            influxdb_config = storage_config.get("InfluxDB", {})
+            questdb_config = storage_config.get("QuestDB", {})
             instruments_config = storage_config.get("Instruments", {})
             kline_config = storage_config.get("KLine", {})
             
+            # QuestDB表前缀配置
+            questdb_table_prefix = questdb_config.get("TablePrefix", {})
+            questdb_partition = questdb_config.get("Partition", {})
+            
             cls.Storage = StorageConfig(
                 enabled=bool(storage_config.get("Enabled", False)),
-                influxdb=InfluxDBConfig(
-                    host=influxdb_config.get("Host", "http://localhost:8181"),
-                    token=influxdb_config.get("Token", ""),
-                    database=influxdb_config.get("Database", "tick_data"),
-                    batch_size=int(influxdb_config.get("BatchSize", 1000)),
-                    flush_interval=float(influxdb_config.get("FlushInterval", 5.0)),
+                questdb=QuestDBConfig(
+                    host=questdb_config.get("Host", "localhost"),
+                    http_port=int(questdb_config.get("HttpPort", 9000)),
+                    ilp_port=int(questdb_config.get("IlpPort", 9009)),
+                    database=questdb_config.get("Database", "tick_data"),
+                    batch_size=int(questdb_config.get("BatchSize", 100)),
+                    flush_interval=float(questdb_config.get("FlushInterval", 0.1)),
+                    max_retries=int(questdb_config.get("MaxRetries", 3)),
+                    table_prefix_tick=questdb_table_prefix.get("Tick", "tick_"),
+                    table_prefix_kline=questdb_table_prefix.get("Kline", "kline_"),
+                    partition_tick=questdb_partition.get("Tick", "DAY"),
+                    partition_kline=questdb_partition.get("Kline", "MONTH"),
                 ),
                 instruments=InstrumentsConfig(
                     cache_path=instruments_config.get("CachePath", "./data/instruments.json"),

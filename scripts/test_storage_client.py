@@ -136,9 +136,17 @@ class TestStorageClient:
         
         return False
     
-    async def listen_market_data(self, duration: int = 60):
-        """监听行情数据"""
-        logger.info(f"开始监听行情数据（{duration}秒）...")
+    async def listen_market_data(self, duration: int = 0):
+        """
+        监听行情数据
+        
+        Args:
+            duration: 监听时长（秒），0表示持续监听直到Ctrl+C
+        """
+        if duration == 0:
+            logger.info("开始持续监听行情数据（按 Ctrl+C 停止）...")
+        else:
+            logger.info(f"开始监听行情数据（{duration}秒）...")
         logger.info("=" * 60)
         
         tick_count = 0
@@ -147,10 +155,11 @@ class TestStorageClient:
         
         try:
             while True:
-                # 检查是否超时
-                elapsed = asyncio.get_event_loop().time() - start_time
-                if elapsed >= duration:
-                    break
+                # 检查是否超时（如果设置了时长）
+                if duration > 0:
+                    elapsed = asyncio.get_event_loop().time() - start_time
+                    if elapsed >= duration:
+                        break
                 
                 # 接收消息（不设置超时，让它一直等待）
                 try:
@@ -183,6 +192,7 @@ class TestStorageClient:
                         # 每30秒打印一次进度
                         current_time = asyncio.get_event_loop().time()
                         if current_time - last_log_time >= 30:
+                            elapsed = current_time - start_time
                             logger.info(f"已运行 {int(elapsed)}秒，接收 {tick_count} 个tick")
                             last_log_time = current_time
                 
@@ -270,14 +280,14 @@ def load_test_config(config_path: Path) -> dict:
         
         return {
             "subscribe_limit": test_config.get("SubscribeLimit", 10),
-            "listen_duration": test_config.get("ListenDuration", 60)
+            "listen_duration": test_config.get("ListenDuration", 0)  # 默认0表示持续监听
         }
         
     except Exception as e:
         logger.warning(f"加载测试配置失败: {e}，使用默认值")
         return {
             "subscribe_limit": 10,
-            "listen_duration": 60
+            "listen_duration": 0  # 默认持续监听
         }
 
 
@@ -328,11 +338,14 @@ async def main():
     # 加载测试配置
     test_config = load_test_config(config_path)
     subscribe_limit = test_config["subscribe_limit"]
-    listen_duration = test_config["listen_duration"]
+    listen_duration = test_config.get("listen_duration", 0)  # 默认0表示持续监听
     
     logger.info(f"\n测试配置:")
     logger.info(f"  订阅合约数量: {'所有' if subscribe_limit == 0 else subscribe_limit}")
-    logger.info(f"  监听时长: {listen_duration} 秒")
+    if listen_duration == 0:
+        logger.info(f"  监听模式: 持续监听（按 Ctrl+C 停止）")
+    else:
+        logger.info(f"  监听时长: {listen_duration} 秒")
     
     # 获取登录信息
     logger.info("\n请输入登录信息:")
@@ -407,9 +420,8 @@ async def main():
     logger.info("✅ 测试完成！")
     logger.info("=" * 60)
     logger.info(f"接收到 {tick_count} 个tick数据")
-    logger.info("\n请检查InfluxDB中的数据:")
-    logger.info("  - Tick数据: measurement = tick_{instrument_id}")
-    logger.info("  - K线数据: measurement = kline_{period}_{instrument_id}")
+    logger.info("\n数据已存储到CSV文件:")
+    logger.info("  - 路径: data/ticks/{交易日}/{合约代码}.csv")
     logger.info("=" * 60)
 
 
