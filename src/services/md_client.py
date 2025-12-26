@@ -16,7 +16,7 @@ import time
 import anyio
 from loguru import logger
 
-from ..clients import CTPMdClient
+from ..gateway import CTPMdGateway
 from ..constants import CallError
 from ..constants import CommonConstant as Constant
 from ..constants import MdConstant
@@ -34,7 +34,7 @@ class MdClient(BaseClient):
 
     def __init__(self) -> None:
         super().__init__()
-        self._client: CTPMdClient | None = None
+        self._client: CTPMdGateway | None = None
         self._cache_manager: Optional[CacheManager] = None
         self._metrics_collector: Optional[MetricsCollector] = None
         self._serializer = get_msgpack_serializer()
@@ -148,9 +148,9 @@ class MdClient(BaseClient):
             password: 交易账号密码
 
         Returns:
-            CTPMdClient: CTP行情客户端实例
+            CTPMdGateway: CTP行情CTPMdGateway实例
         """
-        client = CTPMdClient(user_id, password)
+        client = CTPMdGateway(user_id, password)
         
         # 注入存储服务到CTP客户端
         if self._tick_storage:
