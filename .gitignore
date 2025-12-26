@@ -20,3 +20,6 @@ con_file
 .env.*.local
 logs
 logs/
+data/klines/
+data/test_ticks
+data/ticks/
