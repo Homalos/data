@@ -17,7 +17,7 @@ import anyio
 
 from .base_client import BaseClient
 from .cache_manager import CacheManager
-from ..clients import CTPTdClient
+from ..gateway import CTPTdGateway
 from ..constants import CallError
 from ..constants import TdConstant as Constant
 from ..model import REQUEST_PAYLOAD
@@ -33,7 +33,7 @@ class TdClient(BaseClient):
 
     def __init__(self) -> None:
         super().__init__()
-        self._client: CTPTdClient | None = None
+        self._client: CTPTdGateway | None = None
         self._cache_manager: Optional[CacheManager] = None
         self._serializer = get_msgpack_serializer()
         self._user_id: Optional[str] = None
@@ -301,7 +301,7 @@ class TdClient(BaseClient):
         
         logging.debug(f"{self._get_client_type()} client stopped")
 
-    def _create_ctp_client(self, user_id: str, password: str) -> CTPTdClient:
+    def _create_ctp_client(self, user_id: str, password: str) -> CTPTdGateway:
         """创建CTP交易客户端实例
 
         Args:
@@ -309,15 +309,9 @@ class TdClient(BaseClient):
             password (str): CTP交易账号密码
 
         Returns:
-            CTPTdClient: CTP交易客户端实例对象
+            CTPTdGateway: CTP交易CTPTdGateway实例对象
         """
-        client = CTPTdClient(user_id, password)
-        
-        # 【新增】注入 InstrumentManager 到 CTP 客户端
-        if self._instrument_manager:
-            client.set_instrument_manager(self._instrument_manager)
-            logger.info("TdClient: InstrumentManager 已注入到 CTP 客户端")
-        
+        client = CTPTdGateway(user_id, password)
         return client
 
     def _get_client_type(self) -> str:
