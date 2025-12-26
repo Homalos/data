@@ -27,12 +27,14 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
         self._front_address:str = GlobalConfig.TdFrontAddress
         self._broker_id:str = GlobalConfig.BrokerID
         self._auth_code:str = GlobalConfig.AuthCode
+        self._user_product_info:str = GlobalConfig.UserProductInfo
         self._app_id:str = GlobalConfig.AppID
         self._user_id:str = user_id
         self._password: str = password
         self._rsp_callback: Callable[[dict[str, Any]], None] | None = None
         self._api: tdapi.CThostFtdcTraderApi | None = None
         self._connected: bool = False
+        self._request_id: int = 0  # 请求ID
         # Reconnection control
         self._reconnection_ctrl = ReconnectionController(max_attempts=5, interval=10.0, client_type="Td")
         # Settlement confirmation state
@@ -40,8 +42,8 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
         self._settlement_confirmed: bool = False
         # Instrument manager (新增)
         self._instrument_manager = None
-        self._auto_query_instruments: bool = True  # 是否自动查询合约
         self._instruments_cache: list = []  # 临时缓存查询到的合约
+        logger.set_default_tag("tdClient")
         logger.info(f"Td front_address: {self._front_address}, broker_id: {self._broker_id}, "
                     f"auth_code: {self._auth_code}, app_id: {self._app_id}, user_id: {self._user_id}")
 
@@ -64,8 +66,18 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
                      字典包含响应数据的具体内容
         """
         self._rsp_callback = callback
+
+    def _get_next_request_id(self) -> int:
+        """
+        获取下一个请求ID
+
+        Returns:
+            int: 递增后的请求ID
+        """
+        self._request_id += 1
+        return self._request_id
     
-    def set_instrument_manager(self, instrument_manager):
+    def set_instrument_manager(self, instrument_manager) -> None:
         """
         设置合约管理器
         
@@ -209,8 +221,9 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
         req = tdapi.CThostFtdcReqAuthenticateField()
         req.BrokerID = self._broker_id
         req.UserID = self._user_id
-        req.AppID = self._app_id
         req.AuthCode = self._auth_code
+        req.AppID = self._app_id
+        req.UserProductInfo = self._user_product_info
         self._api.ReqAuthenticate(req, 0)
 
     def OnRspAuthenticate(
@@ -233,10 +246,10 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
             None: 此方法无返回值，认证结果通过日志输出和后续操作处理
         """
         if rsp_info_field is None or rsp_info_field.ErrorID == 0:
-            logger.info("authenticate success, start to login")
+            logger.info("Authenticate success, start to login")
             self.login()
         else:
-            logger.info("authenticate failed, please try again")
+            logger.info("Authenticate failed, please try again")
             self.process_connect_result(Constant.OnRspAuthenticate, rsp_info_field)
 
     def login(self):
@@ -253,8 +266,8 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
         req.BrokerID = self._broker_id
         req.UserID = self._user_id
         req.Password = self._password
-        req.UserProductInfo = "homalos"
-        self._api.ReqUserLogin(req, 0)
+        req.UserProductInfo = self._user_product_info
+        self._api.ReqUserLogin(req, self._get_next_request_id())
 
     def OnRspUserLogin(
             self,
@@ -278,7 +291,7 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
             None: 该回调函数不返回任何值，结果通过异步事件处理
         """
         if rsp_info_field is None or rsp_info_field.ErrorID == 0:
-            logger.info("login success, start to confirm settlement info")
+            logger.info("Td login success, start to confirm settlement info")
             # 立即提取并保存登录响应数据的副本，避免CTP对象生命周期问题
             self._pending_login_response = {
                 "rsp_info": {
@@ -289,7 +302,7 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
             }
             self.settlement_confirm()
         else:
-            logger.info("login failed, please try again")
+            logger.info("Td login failed, please try again")
             self.process_connect_result(Constant.OnRspUserLogin, rsp_info_field)
 
     def settlement_confirm(self):
@@ -305,7 +318,7 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
         req = tdapi.CThostFtdcSettlementInfoConfirmField()
         req.BrokerID = self._broker_id
         req.InvestorID = self._user_id
-        self._api.ReqSettlementInfoConfirm(req, 0)
+        self._api.ReqSettlementInfoConfirm(req, self._get_next_request_id())
 
     def OnRspSettlementInfoConfirm(
             self,
@@ -323,7 +336,7 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
         这确保了客户端收到登录成功响应时，可以立即开始交易操作。
         """
         if rsp_info_field is None or rsp_info_field.ErrorID == 0:
-            logger.info("settlement info confirm success")
+            logger.info("Settlement info confirm success")
             self._settlement_confirmed = True
             
             # 发送之前保存的登录响应给客户端
@@ -332,30 +345,16 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
                 response = CTPObjectHelper.build_response_dict(
                     Constant.OnRspUserLogin,
                     None,  # 不使用 rsp_info_field，使用保存的数据
-                    0,
+                    self._get_next_request_id(),
                     True
                 )
                 response[Constant.RspInfo] = self._pending_login_response["rsp_info"]
                 response[Constant.RspUserLogin] = self._pending_login_response["rsp_user_login"]
                 self.rsp_callback(response)
                 self._pending_login_response = None
-                logger.info("login response sent to client after settlement confirmation")
-            
-            # 【新增】自动查询全市场合约
-            if self._auto_query_instruments and self._instrument_manager:
-                logger.info("开始自动查询全市场合约...")
-                # 发起合约查询请求（查询所有合约，InstrumentID为空）
-                req = tdapi.CThostFtdcQryInstrumentField()
-                req.InstrumentID = ""  # 空表示查询所有合约
-                # 等待1秒避免查询过快
-                time.sleep(1)
-                ret = self._api.ReqQryInstrument(req, 0)
-                if ret == 0:
-                    logger.info("合约查询请求已发送")
-                else:
-                    logger.error(f"合约查询请求发送失败，返回码: {ret}")
+                logger.info("Td login response sent to client after settlement confirmation")
         else:
-            logger.error(f"settlement info confirm failed, ErrorID: {rsp_info_field.ErrorID}, ErrorMsg: {rsp_info_field.ErrorMsg}")
+            logger.error(f"Settlement info confirm failed, ErrorID: {rsp_info_field.ErrorID}, ErrorMsg: {rsp_info_field.ErrorMsg}")
             
             # 结算单确认失败，通知客户端登录失败
             if self._pending_login_response:
@@ -370,7 +369,7 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
             rsp_info_field: tdapi.CThostFtdcRspInfoField,
             request_id: int,
             is_last: bool
-    ):
+    ) -> None:
         """
         查询结算信息确认响应回调函数
 
@@ -405,7 +404,7 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
             message_type: str,
             rsp_info_field: tdapi.CThostFtdcRspInfoField,
             rsp_user_login_field: tdapi.CThostFtdcRspUserLoginField = None
-    ):
+    ) -> None:
         """处理CTP交易连接结果回调
 
         将CTP交易接口的连接结果转换为标准响应格式，并通过回调函数返回。
@@ -437,14 +436,14 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
         Note:
             查询结果将通过 OnRspQryInstrument 回调方法返回
         """
-        logger.info(f"[TdClient] 准备发送合约查询请求: {request}")
+        logger.info(f"准备发送合约查询请求: {request}")
         req, request_id = CTPObjectHelper.extract_request(request, Constant.ReqQryInstrument, tdapi.CThostFtdcQryInstrumentField)
-        logger.debug(f"[TdClient] 提取的请求参数 - InstrumentID: {req.InstrumentID if req else 'None'}, RequestID: {request_id}")
-        logger.info(f"[TdClient] 调用 CTP API: ReqQryInstrument")
+        logger.debug(f"提取的请求参数 - InstrumentID: {req.InstrumentID if req else 'None'}, RequestID: {request_id}")
+        logger.info(f"调用 CTP API: ReqQryInstrument")
         ret = self._api.ReqQryInstrument(req, request_id)
-        logger.info(f"[TdClient] CTP API 返回值: {ret} (0=成功, 非0=失败)")
+        logger.info(f"CTP API 返回值: {ret} (0=成功, 非0=失败)")
         if ret != 0:
-            logger.error(f"[TdClient] ReqQryInstrument 调用失败，返回码: {ret}")
+            logger.error(f"ReqQryInstrument 调用失败，返回码: {ret}")
         self.method_called(Constant.OnRspQryInstrument, ret)
 
     def OnRspQryInstrument(
