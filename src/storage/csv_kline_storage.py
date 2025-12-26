@@ -32,9 +32,9 @@ class CSVKLineStorage:
         self._running = False
         self._background_task: Optional[asyncio.Task] = None
         
-        # CSV字段顺序（与现有格式保持一致）
+        # CSV字段顺序（使用ISO 8601标准时间格式）
         self._csv_fields = [
-            'datetime',
+            'timestamp',
             'open',
             'high',
             'low',
@@ -115,14 +115,15 @@ class CSVKLineStorage:
         Returns:
             CSV行数据字典
         """
-        # 生成时间戳（与现有格式保持一致）
+        # 生成ISO 8601标准时间戳 (YYYY-MM-DDTHH:mm:ss.000Z)
         if kline_bar.start_time:
-            datetime_str = kline_bar.start_time.strftime("%Y-%m-%d %H:%M:%S")
+            # K线时间精确到秒，毫秒部分为000
+            timestamp = kline_bar.start_time.strftime("%Y-%m-%dT%H:%M:%S.000Z")
         else:
-            datetime_str = ""
+            timestamp = ""
         
         csv_row = {
-            'datetime': datetime_str,
+            'timestamp': timestamp,
             'open': kline_bar.open,
             'high': kline_bar.high,
             'low': kline_bar.low,

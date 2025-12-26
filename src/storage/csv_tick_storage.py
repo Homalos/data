@@ -133,19 +133,20 @@ class CSVTickStorage:
         Returns:
             CSV行数据字典
         """
-        # 生成时间戳
+        # 生成ISO 8601标准时间戳 (YYYY-MM-DDTHH:mm:ss.sssZ)
         update_time = tick_data.get('UpdateTime', '')
         update_millisec = tick_data.get('UpdateMillisec', 0)
         trading_day = tick_data.get('TradingDay', '')
         
-        # 构建ISO时间戳
+        # 构建ISO 8601时间戳
         if update_time and trading_day:
             try:
-                timestamp = f"{trading_day[:4]}-{trading_day[4:6]}-{trading_day[6:8]}T{update_time}.{update_millisec:03d}"
+                # 格式: 2025-12-27T09:30:15.500Z
+                timestamp = f"{trading_day[:4]}-{trading_day[4:6]}-{trading_day[6:8]}T{update_time}.{update_millisec:03d}Z"
             except:
-                timestamp = datetime.now().isoformat()
+                timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
         else:
-            timestamp = datetime.now().isoformat()
+            timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
         
         # 映射字段
         csv_row = {
