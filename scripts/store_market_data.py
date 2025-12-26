@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-订阅并存储所有期货合约的tick数据
+订阅并存储所有期货合约的tick数据和K线数据
 
 此脚本会：
 1. 从 data/instruments.json 加载所有期货合约
 2. 连接到行情服务
 3. 订阅所有期货合约
 4. 接收tick数据并使用CSV存储引擎保存到 data/ticks/{交易日}/{合约代码}.csv
+5. 实时合成K线并保存到 data/klines/{交易日}/{周期}/{合约代码}.csv
 """
 import asyncio
 import websockets
@@ -23,6 +24,8 @@ sys.path.insert(0, str(project_root))
 
 from src.utils.config import GlobalConfig
 from src.storage.csv_tick_storage import CSVTickStorage
+from src.storage.csv_kline_storage import CSVKLineStorage
+from src.storage.kline_builder import KLineBuilder
 
 
 class TickSubscriber:
@@ -38,25 +41,78 @@ class TickSubscriber:
         
         # CSV存储引擎
         self.tick_storage = None
+        
+        # K线相关
+        self.kline_storage = None
+        self.kline_builder = None
     
-    async def initialize_storage(self, base_path: str = "./data/ticks"):
-        """初始化存储引擎"""
+    async def initialize_storage(
+        self, 
+        tick_base_path: str = "./data/ticks",
+        kline_base_path: str = "./data/klines",
+        kline_periods: list = None
+    ):
+        """
+        初始化存储引擎
+        
+        Args:
+            tick_base_path: Tick数据存储路径
+            kline_base_path: K线数据存储路径
+            kline_periods: K线周期列表
+        """
+        # 初始化Tick存储
         try:
-            self.tick_storage = CSVTickStorage(base_path=base_path)
+            self.tick_storage = CSVTickStorage(base_path=tick_base_path)
             await self.tick_storage.initialize()
-            logger.info(f"CSV存储引擎初始化成功，路径: {base_path}")
+            logger.info(f"CSV Tick存储引擎初始化成功，路径: {tick_base_path}")
         except Exception as e:
-            logger.error(f"初始化存储引擎失败: {e}")
+            logger.error(f"初始化Tick存储引擎失败: {e}")
+            raise
+        
+        # 初始化K线存储
+        try:
+            self.kline_storage = CSVKLineStorage(base_path=kline_base_path)
+            await self.kline_storage.initialize()
+            logger.info(f"CSV K线存储引擎初始化成功，路径: {kline_base_path}")
+        except Exception as e:
+            logger.error(f"初始化K线存储引擎失败: {e}")
+            raise
+        
+        # 初始化K线合成器
+        try:
+            if kline_periods is None:
+                kline_periods = ["1m", "3m", "5m", "10m", "15m", "30m", "60m", "1d"]
+            self.kline_builder = KLineBuilder(self.kline_storage, enabled_periods=kline_periods)
+            logger.info(f"K线合成器初始化成功，周期: {kline_periods}")
+        except Exception as e:
+            logger.error(f"初始化K线合成器失败: {e}")
             raise
     
     async def close_storage(self):
         """关闭存储引擎"""
+        # 关闭K线合成器（会保存未完成的K线）
+        if self.kline_builder:
+            try:
+                await self.kline_builder.close()
+                logger.info("K线合成器已关闭")
+            except Exception as e:
+                logger.error(f"关闭K线合成器失败: {e}")
+        
+        # 关闭K线存储
+        if self.kline_storage:
+            try:
+                await self.kline_storage.close()
+                logger.info("CSV K线存储引擎已关闭")
+            except Exception as e:
+                logger.error(f"关闭K线存储引擎失败: {e}")
+        
+        # 关闭Tick存储
         if self.tick_storage:
             try:
                 await self.tick_storage.close()
-                logger.info("CSV存储引擎已关闭")
+                logger.info("CSV Tick存储引擎已关闭")
             except Exception as e:
-                logger.error(f"关闭存储引擎失败: {e}")
+                logger.error(f"关闭Tick存储引擎失败: {e}")
     
     async def connect(self):
         """连接到WebSocket服务"""
@@ -210,6 +266,13 @@ class TickSubscriber:
                             except Exception as e:
                                 logger.error(f"存储tick数据失败: {e}")
                         
+                        # 合成K线
+                        if self.kline_builder:
+                            try:
+                                await self.kline_builder.on_tick(depth_data)
+                            except Exception as e:
+                                logger.error(f"合成K线失败: {e}")
+                        
                         # 每100个tick打印一次
                         if self.tick_count % 100 == 0:
                             logger.info(
@@ -226,12 +289,15 @@ class TickSubscriber:
                             rate = self.tick_count / elapsed if elapsed > 0 else 0
                             
                             # 获取存储统计
-                            stats = self.tick_storage.get_stats() if self.tick_storage else {}
-                            buffered = stats.get("buffered_records", 0)
+                            tick_stats = self.tick_storage.get_stats() if self.tick_storage else {}
+                            tick_buffered = tick_stats.get("buffered_records", 0)
+                            
+                            kline_stats = self.kline_builder.get_stats() if self.kline_builder else {}
+                            kline_bars = kline_stats.get("total_bars", 0)
                             
                             logger.info(
                                 f"运行 {int(elapsed)}秒，接收 {self.tick_count} 个tick "
-                                f"({rate:.1f} tick/秒)，缓冲 {buffered} 条"
+                                f"({rate:.1f} tick/秒)，缓冲 {tick_buffered} 条，K线 {kline_bars} 根"
                             )
                             self.last_log_time = current_time
                 
@@ -373,11 +439,15 @@ async def main():
     
     # 获取存储配置
     csv_config = GlobalConfig.Storage.csv
+    kline_config = GlobalConfig.Storage.kline
+    
     logger.info(f"\n存储配置:")
-    logger.info(f"  类型: CSV")
-    logger.info(f"  路径: {csv_config.base_path}")
-    logger.info(f"  刷新间隔: {csv_config.flush_interval}秒")
-    logger.info(f"  批量大小: {csv_config.batch_size}")
+    logger.info(f"  Tick存储:")
+    logger.info(f"    路径: {csv_config.base_path}")
+    logger.info(f"    刷新间隔: {csv_config.flush_interval}秒")
+    logger.info(f"  K线存储:")
+    logger.info(f"    路径: ./data/klines")
+    logger.info(f"    周期: {kline_config.periods}")
     
     logger.info("\n开始订阅流程...\n")
     
@@ -387,7 +457,11 @@ async def main():
     
     try:
         # 初始化存储引擎
-        await client.initialize_storage(base_path=csv_config.base_path)
+        await client.initialize_storage(
+            tick_base_path=csv_config.base_path,
+            kline_base_path="./data/klines",
+            kline_periods=kline_config.periods
+        )
         
         # 连接
         if not await client.connect():
@@ -411,9 +485,15 @@ async def main():
         logger.info("订阅流程完成！")
         logger.info("=" * 60)
         logger.info(f"接收到 {tick_count} 个tick数据")
+        
+        # 打印K线统计
+        if client.kline_builder:
+            kline_stats = client.kline_builder.get_stats()
+            logger.info(f"合成K线 {kline_stats.get('total_bars', 0)} 根")
+        
         logger.info("\n数据已存储到CSV文件:")
-        logger.info("  - 路径: data/ticks/{交易日}/{合约代码}.csv")
-        logger.info("  - 格式: CSV (包含完整的tick数据)")
+        logger.info("  - Tick: data/ticks/{交易日}/{合约代码}.csv")
+        logger.info("  - K线: data/klines/{交易日}/{周期}/{合约代码}.csv")
         logger.info("=" * 60)
         
     finally:
