@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-@ProjectName: homalos-webctp
-@FileName   : td_client.py
+@ProjectName: homalos-data
+@FileName   : td_gateway.py
 @Date       : 2025/12/3 13:30
 @Author     : Lumosylva
 @Email      : donnymoving@gmail.com
 @Software   : PyCharm
-@Description: 交易客户端 (继承 CThostFtdcTraderSpi)
+@Description: 交易gateway (继承 CThostFtdcTraderSpi)
 """
 import time
 from typing import Callable, Any
@@ -20,7 +20,7 @@ from ..constants import TdConstant as Constant
 from ..utils import CTPObjectHelper, GlobalConfig, MathHelper, logger
 
 
-class TdClient(tdapi.CThostFtdcTraderSpi):
+class TdGateway(tdapi.CThostFtdcTraderSpi):
 
     def __init__(self, user_id, password):
         super().__init__()
@@ -40,9 +40,6 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
         # Settlement confirmation state
         self._pending_login_response: dict | None = None
         self._settlement_confirmed: bool = False
-        # Instrument manager (新增)
-        self._instrument_manager = None
-        self._instruments_cache: list = []  # 临时缓存查询到的合约
         logger.set_default_tag("tdClient")
         logger.info(f"Td front_address: {self._front_address}, broker_id: {self._broker_id}, "
                     f"auth_code: {self._auth_code}, app_id: {self._app_id}, user_id: {self._user_id}")
@@ -77,15 +74,7 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
         self._request_id += 1
         return self._request_id
     
-    def set_instrument_manager(self, instrument_manager) -> None:
-        """
-        设置合约管理器
-        
-        Args:
-            instrument_manager: InstrumentManager实例
-        """
-        self._instrument_manager = instrument_manager
-        logger.info("合约管理器已注入到TdClient")
+
 
     def method_called(self, msg_type: str, ret: int):
         """处理API方法调用结果
@@ -467,61 +456,9 @@ class TdClient(tdapi.CThostFtdcTraderSpi):
         Returns:
             无返回值，通过回调函数将响应数据返回给调用方
         """
-        logger.debug(f"[TdClient-回调] OnRspQryInstrument - IsLast: {is_last}")
+        logger.debug(f"OnRspQryInstrument - IsLast: {is_last}")
         
-        # 【新增】收集合约信息用于自动保存
-        if instrument_field and self._instrument_manager:
-            try:
-                from ..storage.instrument_manager import InstrumentInfo
-                
-                instrument_id = instrument_field.InstrumentID
-                
-                # 只收集期货合约，过滤期权
-                if InstrumentInfo.is_futures(instrument_id):
-                    # 创建合约信息对象（简化版）
-                    info = InstrumentInfo(
-                        instrument_id=instrument_id,
-                        exchange_id=instrument_field.ExchangeID,
-                        product_id=instrument_field.ProductID,
-                        volume_multiple=instrument_field.VolumeMultiple,
-                        price_tick=instrument_field.PriceTick
-                    )
-                    
-                    # 添加到临时缓存
-                    self._instruments_cache.append(info)
-                    
-                    # 每100个合约打印一次进度
-                    if len(self._instruments_cache) % 100 == 0:
-                        logger.info(f"已接收 {len(self._instruments_cache)} 个期货合约...")
-                
-            except Exception as e:
-                logger.error(f"解析合约信息失败: {e}")
-        
-        # 【新增】查询完成后保存到JSON文件
-        if is_last and self._instrument_manager and len(self._instruments_cache) > 0:
-            try:
-                logger.info(f"合约查询完成，共 {len(self._instruments_cache)} 个期货合约（已过滤期权）")
-                
-                # 更新合约管理器
-                self._instrument_manager.instruments = {
-                    inst.instrument_id: inst 
-                    for inst in self._instruments_cache
-                }
-                from datetime import datetime
-                self._instrument_manager.update_time = datetime.now()
-                
-                # 保存到JSON文件
-                self._instrument_manager.save_to_cache()
-                
-                # 清空临时缓存
-                self._instruments_cache = []
-                
-                logger.info("✅ 合约信息已自动保存到JSON文件")
-                
-            except Exception as e:
-                logger.error(f"保存合约信息失败: {e}", exc_info=True)
-        
-        # 原有逻辑：构建响应并回调
+        # 构建响应并回调
         response = CTPObjectHelper.build_response_dict(Constant.OnRspQryInstrument, rsp_info, request_id, is_last)
         rsp_instrument = {}
         if instrument_field:
