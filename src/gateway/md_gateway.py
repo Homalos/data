@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-@ProjectName: homalos-webctp
-@FileName   : md_client.py
+@ProjectName: homalos-data
+@FileName   : md_gateway.py
 @Date       : 2025/12/3 13:40
 @Author     : Lumosylva
 @Email      : donnymoving@gmail.com
 @Software   : PyCharm
-@Description: 行情客户端 (继承 CThostFtdcMdSpi)
+@Description: 行情gateway (继承 CThostFtdcMdSpi)
 """
 import time
 import uuid
@@ -22,7 +22,7 @@ from ..utils import CTPObjectHelper, GlobalConfig, MathHelper, logger
 from .client_helper import ReconnectionController
 
 
-class MdClient(mdapi.CThostFtdcMdSpi):
+class MdGateway(mdapi.CThostFtdcMdSpi):
 
     def __init__(self, user_id, password):
         super().__init__()
@@ -33,17 +33,10 @@ class MdClient(mdapi.CThostFtdcMdSpi):
         self._rsp_callback: Callable[[dict[str, Any]], None] | None = None
         self._api: mdapi.CThostFtdcMdApi | None = None
         self._connected: bool = False
+        self._request_id: int = 0
         # Reconnection control
         self._reconnection_ctrl = ReconnectionController(max_attempts=5, interval=10.0, client_type="Md")
-        
-        # 存储相关（新增）
-        self._tick_storage: Optional[Any] = None  # TickStorage实例
-        self._instrument_manager: Optional[Any] = None  # InstrumentManager实例
-        self._kline_builder: Optional[Any] = None  # KLineBuilder实例（新增）
-        
-        # 主event loop引用（将在set_event_loop中设置）
-        self._main_loop: Optional[asyncio.AbstractEventLoop] = None
-        
+
         logger.info(f"Md front_address: {self._front_address}", tag='md_client')
 
     @property
@@ -65,48 +58,18 @@ class MdClient(mdapi.CThostFtdcMdSpi):
             callback: 回调函数，接收一个字典参数（包含响应信息）并返回None
         """
         self._rsp_callback = callback
-    
-    def set_tick_storage(self, tick_storage):
-        """
-        设置Tick存储引擎
-        
-        Args:
-            tick_storage: TickStorage实例
-        """
-        self._tick_storage = tick_storage
-        logger.info("Tick存储引擎已注入到MdClient")
-    
-    def set_instrument_manager(self, instrument_manager):
-        """
-        设置合约管理器
-        
-        Args:
-            instrument_manager: InstrumentManager实例
-        """
-        self._instrument_manager = instrument_manager
-        logger.info("合约管理器已注入到MdClient")
-    
-    def set_kline_builder(self, kline_builder):
-        """
-        设置K线合成器
-        
-        Args:
-            kline_builder: KLineBuilder实例
-        """
-        self._kline_builder = kline_builder
-        logger.info("K线合成器已注入到MdClient")
-    
-    def set_event_loop(self, loop):
-        """
-        设置主event loop引用
-        
-        Args:
-            loop: asyncio event loop实例
-        """
-        self._main_loop = loop
-        logger.info(f"Event loop已注入到MdClient: {loop}")
 
-    def method_called(self, msg_type: str, ret: int):
+    def _get_next_request_id(self) -> int:
+        """
+        获取下一个请求ID
+
+        Returns:
+            int: 递增后的请求ID
+        """
+        self._request_id += 1
+        return self._request_id
+
+    def method_called(self, msg_type: str, ret: int) -> None:
         """
         处理CTP API方法调用结果
 
@@ -168,7 +131,7 @@ class MdClient(mdapi.CThostFtdcMdSpi):
         self._api.RegisterFront(self._front_address)
         return self._api
 
-    def OnFrontConnected(self):
+    def OnFrontConnected(self) -> None:
         """
         前端连接成功回调方法
 
@@ -188,7 +151,7 @@ class MdClient(mdapi.CThostFtdcMdSpi):
         Note:
             该方法由CTP API自动调用，不应手动调用
         """
-        logger.info("Md client connected")
+        logger.info("OnFrontConnected connected")
         if not self._reconnection_ctrl.check_on_connected(
             callback=self._rsp_callback,
             message_type=Constant.OnRspUserLogin,
@@ -198,7 +161,7 @@ class MdClient(mdapi.CThostFtdcMdSpi):
             return
         self.login()
 
-    def OnFrontDisconnected(self, reason):
+    def OnFrontDisconnected(self, reason) -> None:
         """
         前端连接断开回调函数
 
@@ -218,7 +181,7 @@ class MdClient(mdapi.CThostFtdcMdSpi):
             current_time=time.time()
         )
 
-    def login(self):
+    def login(self) -> int:
         """
         执行CTP行情服务器登录操作
 
@@ -228,12 +191,12 @@ class MdClient(mdapi.CThostFtdcMdSpi):
         Returns:
             int: CTP API请求ID，用于标识本次登录请求
         """
-        logger.info(f"start to login for {self._user_id}")
+        logger.info(f"Start to login for {self._user_id}")
         req = mdapi.CThostFtdcReqUserLoginField()
         req.BrokerID = self._broker_id
         req.UserID = self._user_id
         req.Password = self._password
-        return self._api.ReqUserLogin(req, 0)
+        return self._api.ReqUserLogin(req, self._get_next_request_id())
 
     def OnRspUserLogin(
             self,
@@ -241,7 +204,7 @@ class MdClient(mdapi.CThostFtdcMdSpi):
             rsp_info: mdapi.CThostFtdcRspInfoField,
             request_id,
             is_last
-    ):
+    ) -> None:
         """
         处理用户登录响应回调
 
@@ -258,9 +221,9 @@ class MdClient(mdapi.CThostFtdcMdSpi):
             None: 无直接返回值，通过self.rsp_callback方法返回处理后的响应数据
         """
         if rsp_info is None or rsp_info.ErrorID == 0:
-            logger.info("Md client login success")
+            logger.info("Md login success")
         else:
-            logger.info("Md client login failed, please try again")
+            logger.info("Md login failed, please try again")
 
         response = CTPObjectHelper.build_response_dict(Constant.OnRspUserLogin, rsp_info, request_id, is_last)
         response[Constant.RspUserLogin] = {
@@ -287,7 +250,7 @@ class MdClient(mdapi.CThostFtdcMdSpi):
             rsp_info,
             request_id,
             is_last
-    ):
+    ) -> None:
         """
         处理订阅行情数据的响应回调
 
@@ -307,7 +270,10 @@ class MdClient(mdapi.CThostFtdcMdSpi):
             }
         self.rsp_callback(response)
 
-    def OnRtnDepthMarketData(self, depth_marketdata: mdapi.CThostFtdcDepthMarketDataField):
+    def OnRtnDepthMarketData(
+            self,
+            depth_marketdata: mdapi.CThostFtdcDepthMarketDataField
+    ) -> None:
         """
         处理深度市场数据回调
 
@@ -320,7 +286,7 @@ class MdClient(mdapi.CThostFtdcMdSpi):
         Returns:
             None: 无直接返回值，通过self.rsp_callback回调函数返回处理后的数据
         """
-        logger.debug(f"receive depth market data: {depth_marketdata.InstrumentID}")
+        logger.debug(f"Receive depth market data: {depth_marketdata.InstrumentID}")
         depth_data = {
             "ActionDay": depth_marketdata.ActionDay,
             "AskPrice1": MathHelper.adjust_price(depth_marketdata.AskPrice1),
@@ -371,38 +337,8 @@ class MdClient(mdapi.CThostFtdcMdSpi):
             "reserve1": depth_marketdata.reserve1,
             "reserve2": depth_marketdata.reserve2
             }
-        
-        # 【新增】存储tick数据（使用线程安全的方式调度异步任务）
-        if self._tick_storage and self._main_loop:
-            try:
-                logger.debug(f"准备调度tick存储任务: {depth_data.get('InstrumentID')}, loop={self._main_loop}")
-                # 使用保存的主event loop调度任务
-                future = asyncio.run_coroutine_threadsafe(
-                    self._tick_storage.store_tick(depth_data),
-                    self._main_loop
-                )
-                # 不等待结果，让它在后台执行
-                logger.debug(f"✅ 已调度tick存储任务: {depth_data.get('InstrumentID')}")
-            except Exception as e:
-                logger.error(f"存储tick数据失败: {e}", exc_info=True)
-        elif not self._tick_storage:
-            logger.warning("Tick存储引擎未注入")
-        elif not self._main_loop:
-            logger.warning("Event loop未注入，无法调度存储任务")
-        
-        # 【新增】合成K线（使用线程安全的方式调度异步任务）
-        if self._kline_builder and self._main_loop:
-            try:
-                # 使用保存的主event loop调度任务
-                future = asyncio.run_coroutine_threadsafe(
-                    self._kline_builder.on_tick(depth_data),
-                    self._main_loop
-                )
-                # 不等待结果，让它在后台执行
-            except Exception as e:
-                logger.error(f"合成K线失败: {e}")
-        
-        # 原有逻辑：构建响应并回调
+
+        # 构建响应并回调
         response = {
             Constant.MessageType: Constant.OnRtnDepthMarketData,
             Constant.DepthMarketData: depth_data
@@ -415,7 +351,7 @@ class MdClient(mdapi.CThostFtdcMdSpi):
             rsp_info,
             request_id,
             is_last
-    ):
+    ) -> None:
         """
         处理取消订阅行情数据的响应回调
 
@@ -428,7 +364,7 @@ class MdClient(mdapi.CThostFtdcMdSpi):
         Returns:
             None: 无直接返回值，通过回调函数返回响应数据
         """
-        logger.debug("recv unsub market data")
+        logger.debug("Recv unsub market data")
         response = CTPObjectHelper.build_response_dict(Constant.OnRspUnSubMarketData, rsp_info, request_id, is_last)
         if specific_instrument:
             response[Constant.SpecificInstrument] = {
