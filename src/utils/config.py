@@ -173,6 +173,7 @@ class GlobalConfig(object):
     MdFrontAddress: str
     BrokerID: str
     AuthCode: str
+    UserProductInfo: str
     AppID: str
     Host: str
     Port: int
