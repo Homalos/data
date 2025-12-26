@@ -160,10 +160,20 @@ class KLineConfig:
 
 
 @dataclass
+class CSVConfig:
+    """CSV存储配置"""
+    base_path: str = "./data/ticks"
+    flush_interval: float = 1.0
+    batch_size: int = 100
+
+
+@dataclass
 class StorageConfig:
     """存储配置"""
     enabled: bool = False
+    type: str = "csv"  # 存储类型: csv, questdb
     questdb: QuestDBConfig = field(default_factory=QuestDBConfig)
+    csv: CSVConfig = field(default_factory=CSVConfig)
     instruments: InstrumentsConfig = field(default_factory=InstrumentsConfig)
     kline: KLineConfig = field(default_factory=KLineConfig)
 
@@ -229,6 +239,7 @@ class GlobalConfig(object):
                 "WEBCTP_AUTH_CODE", config.get("AuthCode", "")
             )
             cls.AppID = os.environ.get("WEBCTP_APP_ID", config.get("AppID", ""))
+            cls.UserProductInfo = os.environ.get("WEBCTP_USER_PRODUCT_INFO", config.get("UserProductInfo", ""))
             cls.Host = os.environ.get("WEBCTP_HOST", config.get("Host", "0.0.0.0"))
 
             cls.Port = config.get("Port", 8080)
@@ -379,6 +390,7 @@ class GlobalConfig(object):
             # 加载存储配置（可选）
             storage_config = config.get("Storage", {})
             questdb_config = storage_config.get("QuestDB", {})
+            csv_config = storage_config.get("CSV", {})
             instruments_config = storage_config.get("Instruments", {})
             kline_config = storage_config.get("KLine", {})
             
@@ -388,6 +400,7 @@ class GlobalConfig(object):
             
             cls.Storage = StorageConfig(
                 enabled=bool(storage_config.get("Enabled", False)),
+                type=storage_config.get("Type", "csv"),
                 questdb=QuestDBConfig(
                     host=questdb_config.get("Host", "localhost"),
                     http_port=int(questdb_config.get("HttpPort", 9000)),
@@ -400,6 +413,11 @@ class GlobalConfig(object):
                     table_prefix_kline=questdb_table_prefix.get("Kline", "kline_"),
                     partition_tick=questdb_partition.get("Tick", "DAY"),
                     partition_kline=questdb_partition.get("Kline", "MONTH"),
+                ),
+                csv=CSVConfig(
+                    base_path=csv_config.get("BasePath", "./data/ticks"),
+                    flush_interval=float(csv_config.get("FlushInterval", 1.0)),
+                    batch_size=int(csv_config.get("BatchSize", 100)),
                 ),
                 instruments=InstrumentsConfig(
                     cache_path=instruments_config.get("CachePath", "./data/instruments.json"),
