@@ -22,9 +22,6 @@ homalos-data/
 │   ├── ticks/              # Tick数据 (按交易日/合约)
 │   └── klines/             # K线数据 (按交易日/周期/合约)
 ├── scripts/                # 脚本工具
-│   ├── auto_login_td.py    # 交易服务自动登录
-│   ├── subscribe_and_store_ticks.py  # 订阅并存储行情数据
-│   └── fetch_simnow_instruments.py   # 获取合约信息
 ├── src/                    # 源代码
 │   ├── apps/               # FastAPI应用
 │   ├── gateway/            # CTP网关
@@ -162,4 +159,4 @@ start_subscribe_and_store.bat
 
 ## License
 
-MIT
+BSD 3-Clause License
