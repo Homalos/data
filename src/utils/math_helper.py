@@ -9,6 +9,7 @@
 @Software   : PyCharm
 @Description: 数学辅助函数
 """
+import re
 import sys
 
 
@@ -31,3 +32,19 @@ class MathHelper(object):
         if price == sys.float_info.max:
             price = 0
         return price
+
+    @staticmethod
+    def del_num(content) -> str:
+        """
+        从字符串中删除所有数字字符
+
+        使用正则表达式移除字符串中的所有数字字符，保留非数字字符。
+
+        Args:
+            content (str): 需要处理的字符串内容
+
+        Returns:
+            str: 删除所有数字字符后的新字符串
+        """
+        return re.sub(r'\d', '', content)
+
