@@ -377,8 +377,8 @@ async def main():
             from scripts.load_env import load_env
             if load_env(str(env_file)):
                 logger.info("环境变量加载成功")
-        except Exception as e:
-            logger.warning(f"加载 .env 文件失败: {e}")
+        except Exception as err:
+            logger.warning(f"加载 .env 文件失败: {err}")
     
     # 加载配置
     try:

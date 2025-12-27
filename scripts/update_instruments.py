@@ -15,10 +15,11 @@ from typing import Optional
 import websockets
 from loguru import logger
 
-# 添加项目根目录到路径
+# 添加项目根目录到路径（必须在导入src模块之前）
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
+from src.utils import DateTimeHelper
 from src.utils.config import GlobalConfig
 
 
@@ -339,69 +340,42 @@ class TdAutoLogin:
             instrument: 合约信息字典
         """
         try:
-            instrument_id = instrument.get("InstrumentID", "")
-            
+            # 商品类别（'1'-期货，'2'-期权，'3'-组合，'8'-股票，'f'-基金,'b'-债券）
+            product_class = instrument.get("ProductClass", "")
+
             # 只收集期货合约，过滤期权
-            if self._is_futures(instrument_id):
+            if product_class == "1":
                 # 提取关键字段
                 instrument_info = {
-                    "instrument_id": instrument_id,
-                    "exchange_id": instrument.get("ExchangeID", ""),
-                    "product_id": instrument.get("ProductID", ""),
-                    "product_class": instrument.get("ProductClass", ""),
-                    "delivery_year": instrument.get("DeliveryYear", 0),
-                    "delivery_month": instrument.get("DeliveryMonth", 0),
-                    "max_market_order_volume": instrument.get("MaxMarketOrderVolume", 0),
-                    "min_market_order_volume": instrument.get("MinMarketOrderVolume", 0),
-                    "max_limit_order_volume": instrument.get("MaxLimitOrderVolume", 0),
-                    "min_limit_order_volume": instrument.get("MinLimitOrderVolume", 0),
-                    "volume_multiple": instrument.get("VolumeMultiple", 0),
-                    "price_tick": instrument.get("PriceTick", 0.0),
-                    "create_date": instrument.get("CreateDate", ""),
-                    "open_date": instrument.get("OpenDate", ""),
-                    "expire_date": instrument.get("ExpireDate", ""),
-                    "is_trading": instrument.get("IsTrading", 0),
+                    # 合约基本信息
+                    "instrument_id": instrument.get("InstrumentID", ""),        # 合约代码
+                    "instrument_name": instrument.get("InstrumentName", ""),    # 合约名称
+                    "exchange_id": instrument.get("ExchangeID", ""),            # 交易所代码
+                    "product_id": instrument.get("ProductID", ""),              # 产品代码
+                    "product_class": product_class,                             # 产品类型
+                    # 交易规则
+                    "price_tick": instrument.get("PriceTick", 0.0),             # 价格变动最小单位
+                    "volume_multiple": instrument.get("VolumeMultiple", 0),     # 合约乘数（每手数量）
+                    "max_market_order_volume": instrument.get("MaxMarketOrderVolume", 0),   # 市价单最大下单量
+                    "min_market_order_volume": instrument.get("MinMarketOrderVolume", 0),   # 市价单最小下单量
+                    "max_limit_order_volume": instrument.get("MaxLimitOrderVolume", 0),     # 限价单最大下单量
+                    "min_limit_order_volume": instrument.get("MinLimitOrderVolume", 0),     # 限价单最小下单量
+                    # 时间信息
+                    "delivery_year": instrument.get("DeliveryYear", 0),     # 交割年份
+                    "delivery_month": instrument.get("DeliveryMonth", 0),   # 交割月
+                    "create_date": instrument.get("CreateDate", ""),        # 创建日
+                    "open_date": instrument.get("OpenDate", ""),            # 上市日
+                    "expire_date": instrument.get("ExpireDate", ""),        # 到期日
+                    "is_trading": instrument.get("IsTrading", 0),           # 当前是否交易
+                    # 距到期日剩余天数
+                    "expire_rest_days": DateTimeHelper.get_expire_date(instrument.get("ExpireDate", "")),
                 }
                 
                 self._instruments_cache.append(instrument_info)
                 
-        except Exception as e:
-            logger.error(f"收集合约信息失败: {e}")
+        except Exception as err:
+            logger.error(f"收集合约信息失败: {err}")
 
-    @staticmethod
-    def _is_futures(instrument_id: str) -> bool:
-        """
-        判断是否为期货合约（过滤期权）
-
-        期货合约代码规则：
-        - 以字母开头
-        - 最长6位字符
-        - 格式：产品代码(1-2位字母) + 合约月份(3-4位数字)
-        - 例如：ru2501, IF2501, a2501
-
-        期权合约代码规则：
-        - 超过6位字符
-        - 包含 C 或 P（看涨/看跌）
-        - 例如：ru2605P14000, m2501-C-2700
-
-        Args:
-            instrument_id: 合约代码
-
-        Returns:
-            是否为期货合约
-        """
-        if not instrument_id:
-            return False
-        
-        # 必须以字母开头
-        if not instrument_id[0].isalpha():
-            return False
-        
-        # 期货合约代码最长6位
-        if len(instrument_id) > 6:
-            return False
-        
-        return True
 
     def _save_instruments_to_file(self) -> bool:
         """
