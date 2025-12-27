@@ -225,6 +225,56 @@ python scripts/store_market_data.py
 start_store_market_data.bat
 ```
 
+### scheduler.py
+
+定时任务调度器，支持配置多个定时任务在指定时间执行。
+
+功能：
+- 支持 cron 表达式配置执行时间
+- 支持两种任务类型：`service`（启动服务）和 `command`（执行命令）
+- 支持任务启用/禁用
+- 日志记录到 `logs/scheduler.log`
+
+配置文件：`config/scheduler.yaml`
+
+```yaml
+tasks:
+  - name: "启动交易服务"
+    type: service
+    config_file: "./config/config_td.yaml"
+    app_type: td
+    cron: "30 8 * * 1-5"  # 周一到周五 08:30
+    enabled: true
+
+  - name: "更新合约信息"
+    type: command
+    command: "python scripts/update_instruments.py"
+    cron: "0 8 * * 1-5"
+    enabled: false
+```
+
+cron 表达式格式：`分 时 日 月 周`
+
+运行：
+```bash
+# 启动调度器
+python scripts/scheduler.py
+
+# 使用自定义配置
+python scripts/scheduler.py --config=./config/my_scheduler.yaml
+
+# 列出所有任务
+python scripts/scheduler.py --list
+
+# 立即执行指定任务
+python scripts/scheduler.py --run="启动交易服务"
+```
+
+或使用批处理：
+```bash
+start_scheduler.bat
+```
+
 ## License
 
 BSD 3-Clause License
