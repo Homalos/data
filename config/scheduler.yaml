@@ -1,0 +1,45 @@
+# 定时任务调度配置
+# 
+# cron 表达式格式: 分 时 日 月 周
+#   分: 0-59
+#   时: 0-23
+#   日: 1-31
+#   月: 1-12
+#   周: 0-6 (0=周日) 或 mon,tue,wed,thu,fri,sat,sun
+#
+# 示例:
+#   "30 8 * * 1-5"   - 周一到周五 08:30
+#   "0 9 * * *"      - 每天 09:00
+#   "*/5 * * * *"    - 每5分钟
+#   "0 20 * * 1-5"   - 周一到周五 20:00
+
+tasks:
+  # 启动交易服务
+  - name: "启动交易服务"
+    type: service
+    config_file: "./config/config_td.yaml"
+    app_type: td
+    cron: "38 0 * * 0-6"  # 周一到周五 08:30
+    enabled: true
+
+  # 启动行情服务
+  - name: "启动行情服务"
+    type: service
+    config_file: "./config/config_md.yaml"
+    app_type: md
+    cron: "30 8 * * 1-5"  # 周一到周五 08:30
+    enabled: true
+
+  # 更新合约信息（每天早上08:00）
+  - name: "更新合约信息"
+    type: command
+    command: "python scripts/update_instruments.py"
+    cron: "31 8 * * 1-5"  # 周一到周五 08:00
+    enabled: false
+
+  # 订阅并存储行情数据
+  - name: "订阅存储行情"
+    type: command
+    command: "python scripts/store_market_data.py"
+    cron: "35 8 * * 1-5"  # 周一到周五 08:35（服务启动后5分钟）
+    enabled: false
