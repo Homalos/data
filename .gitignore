@@ -20,8 +20,8 @@ con_file
 .env.*.local
 logs
 logs/
+data/
 data/klines/
-data/test_ticks
 data/ticks/
 compress.bat
 files.txt
