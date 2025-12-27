@@ -23,7 +23,7 @@ from src.utils import DateTimeHelper
 from src.utils.config import GlobalConfig
 
 
-class TdAutoLogin:
+class UpdateInstrumentClient(object):
     """交易服务自动登录客户端"""
 
     def __init__(
@@ -453,8 +453,7 @@ class TdAutoLogin:
 async def main():
     """主函数"""
     logger.info("=" * 60)
-    logger.info("交易服务自动登录脚本")
-    logger.info("=" * 60)
+    logger.info("交易服务更新期货合约信息脚本")
 
     # 尝试加载 .env 文件
     import os
@@ -488,8 +487,8 @@ async def main():
             logger.error("未找到配置文件")
             return
 
-    except Exception as e:
-        logger.error(f"加载配置失败: {e}")
+    except Exception as err:
+        logger.error(f"加载配置失败: {err}")
         return
 
     # 获取登录信息
@@ -525,7 +524,7 @@ async def main():
     logger.info(f"  前置地址: {GlobalConfig.TdFrontAddress}")
 
     # 创建客户端并运行
-    client = TdAutoLogin(
+    client = UpdateInstrumentClient(
         host=host,
         port=port,
         token=token,
@@ -542,9 +541,7 @@ async def main():
         logger.info("自动登录流程完成")
         logger.info("=" * 60)
         logger.info("\n下一步:")
-        logger.info("1. 运行测试脚本查看合约信息:")
-        logger.info("   python scripts/test_auto_query_instruments.py")
-        logger.info("\n2. 查看合约JSON文件:")
+        logger.info("\n查看合约JSON文件:")
         logger.info("   data/instruments.json")
     else:
         logger.error("\n" + "=" * 60)

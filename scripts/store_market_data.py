@@ -28,14 +28,14 @@ from src.storage.csv_kline_storage import CSVKLineStorage
 from src.storage.kline_builder import KLineBuilder
 
 
-class TickSubscriber:
-    """Tick数据订阅客户端（带存储功能）"""
+class DataSubscriber(object):
+    """行情数据订阅存储客户端"""
     
     def __init__(self, url: str = "ws://127.0.0.1:8080/"):
-        self.url = url
+        self.url: str = url
         self.ws = None
-        self.request_id = 0
-        self.tick_count = 0
+        self.request_id: int = 0
+        self.tick_count: int = 0
         self.last_log_time = 0
         self.start_time = 0
         
@@ -51,7 +51,7 @@ class TickSubscriber:
         tick_base_path: str = "./data/ticks",
         kline_base_path: str = "./data/klines",
         kline_periods: list = None
-    ):
+    ) -> None:
         """
         初始化存储引擎
         
@@ -65,8 +65,8 @@ class TickSubscriber:
             self.tick_storage = CSVTickStorage(base_path=tick_base_path)
             await self.tick_storage.initialize()
             logger.info(f"CSV Tick存储引擎初始化成功，路径: {tick_base_path}")
-        except Exception as e:
-            logger.error(f"初始化Tick存储引擎失败: {e}")
+        except Exception as err:
+            logger.error(f"初始化Tick存储引擎失败: {err}")
             raise
         
         # 初始化K线存储
@@ -74,8 +74,8 @@ class TickSubscriber:
             self.kline_storage = CSVKLineStorage(base_path=kline_base_path)
             await self.kline_storage.initialize()
             logger.info(f"CSV K线存储引擎初始化成功，路径: {kline_base_path}")
-        except Exception as e:
-            logger.error(f"初始化K线存储引擎失败: {e}")
+        except Exception as err:
+            logger.error(f"初始化K线存储引擎失败: {err}")
             raise
         
         # 初始化K线合成器
@@ -84,37 +84,37 @@ class TickSubscriber:
                 kline_periods = ["1m", "3m", "5m", "10m", "15m", "30m", "60m", "1d"]
             self.kline_builder = KLineBuilder(self.kline_storage, enabled_periods=kline_periods)
             logger.info(f"K线合成器初始化成功，周期: {kline_periods}")
-        except Exception as e:
-            logger.error(f"初始化K线合成器失败: {e}")
+        except Exception as err:
+            logger.error(f"初始化K线合成器失败: {err}")
             raise
     
-    async def close_storage(self):
+    async def close_storage(self) -> None:
         """关闭存储引擎"""
         # 关闭K线合成器（会保存未完成的K线）
         if self.kline_builder:
             try:
                 await self.kline_builder.close()
                 logger.info("K线合成器已关闭")
-            except Exception as e:
-                logger.error(f"关闭K线合成器失败: {e}")
+            except Exception as err:
+                logger.error(f"关闭K线合成器失败: {err}")
         
         # 关闭K线存储
         if self.kline_storage:
             try:
                 await self.kline_storage.close()
                 logger.info("CSV K线存储引擎已关闭")
-            except Exception as e:
-                logger.error(f"关闭K线存储引擎失败: {e}")
+            except Exception as err:
+                logger.error(f"关闭K线存储引擎失败: {err}")
         
         # 关闭Tick存储
         if self.tick_storage:
             try:
                 await self.tick_storage.close()
                 logger.info("CSV Tick存储引擎已关闭")
-            except Exception as e:
-                logger.error(f"关闭Tick存储引擎失败: {e}")
+            except Exception as err:
+                logger.error(f"关闭Tick存储引擎失败: {err}")
     
-    async def connect(self):
+    async def connect(self) -> bool:
         """连接到WebSocket服务"""
         try:
             logger.info(f"正在连接到行情服务: {self.url}")
@@ -130,11 +130,11 @@ class TickSubscriber:
             logger.info("连接成功")
             return True
             
-        except Exception as e:
-            logger.error(f"连接失败: {e}")
+        except Exception as err:
+            logger.error(f"连接失败: {err}")
             return False
     
-    async def send_request(self, request: dict):
+    async def send_request(self, request: dict) -> None:
         """发送请求"""
         try:
             request["RequestID"] = self.request_id
@@ -144,10 +144,10 @@ class TickSubscriber:
             await self.ws.send(message)
             logger.debug(f"发送请求: {request.get('MsgType')}")
             
-        except Exception as e:
-            logger.error(f"发送请求失败: {e}")
+        except Exception as err:
+            logger.error(f"发送请求失败: {err}")
     
-    async def receive_response(self, timeout: float = 30.0):
+    async def receive_response(self, timeout: float = 30.0) -> json:
         """接收响应（跳过Ping消息）"""
         try:
             while True:
@@ -167,11 +167,11 @@ class TickSubscriber:
         except asyncio.TimeoutError:
             logger.error(f"接收响应超时（{timeout}秒）")
             return None
-        except Exception as e:
-            logger.error(f"接收响应失败: {e}")
+        except Exception as err:
+            logger.error(f"接收响应失败: {err}")
             return None
     
-    async def login(self, user_id: str = "", password: str = ""):
+    async def login(self, user_id: str = "", password: str = "") -> bool:
         """登录"""
         logger.info(f"正在登录，账号: {user_id}")
         
@@ -207,7 +207,7 @@ class TickSubscriber:
         
         return False
     
-    async def subscribe_market_data(self, instruments: list):
+    async def subscribe_market_data(self, instruments: list) -> bool:
         """订阅行情"""
         logger.info(f"正在订阅 {len(instruments)} 个期货合约...")
         
@@ -229,7 +229,7 @@ class TickSubscriber:
         
         return False
     
-    async def listen_and_store(self):
+    async def listen_and_store(self) -> int:
         """
         监听并存储行情数据
         """
@@ -263,15 +263,15 @@ class TickSubscriber:
                         if self.tick_storage:
                             try:
                                 await self.tick_storage.store_tick(depth_data)
-                            except Exception as e:
-                                logger.error(f"存储tick数据失败: {e}")
+                            except Exception as err:
+                                logger.error(f"存储tick数据失败: {err}")
                         
                         # 合成K线
                         if self.kline_builder:
                             try:
                                 await self.kline_builder.on_tick(depth_data)
-                            except Exception as e:
-                                logger.error(f"合成K线失败: {e}")
+                            except Exception as err:
+                                logger.error(f"合成K线失败: {err}")
                         
                         # 每100个tick打印一次
                         if self.tick_count % 100 == 0:
@@ -301,8 +301,8 @@ class TickSubscriber:
                             )
                             self.last_log_time = current_time
                 
-                except Exception as e:
-                    logger.error(f"接收数据失败: {e}")
+                except Exception as err:
+                    logger.error(f"接收数据失败: {err}")
                     break
         
         except KeyboardInterrupt:
@@ -318,7 +318,7 @@ class TickSubscriber:
         
         return self.tick_count
     
-    async def close(self):
+    async def close(self) -> None:
         """关闭连接"""
         if self.ws:
             await self.ws.close()
@@ -337,7 +337,7 @@ def load_instruments_from_json() -> list:
     if not instruments_file.exists():
         logger.error(f"合约文件不存在: {instruments_file}")
         logger.info("\n请先运行自动登录脚本生成合约文件:")
-        logger.info("  python scripts/auto_login_td.py")
+        logger.info("  python scripts/update_instruments.py")
         return []
     
     try:
@@ -358,8 +358,8 @@ def load_instruments_from_json() -> list:
         
         return instrument_ids
         
-    except Exception as e:
-        logger.error(f"加载合约文件失败: {e}")
+    except Exception as err:
+        logger.error(f"加载合约文件失败: {err}")
         return []
 
 
@@ -390,8 +390,8 @@ async def main():
         logger.info(f"加载配置文件: config/config_md.yaml")
         GlobalConfig.load_config(str(config_path))
             
-    except Exception as e:
-        logger.error(f"加载配置失败: {e}")
+    except Exception as err:
+        logger.error(f"加载配置失败: {err}")
         return
     
     # 加载合约列表
@@ -453,7 +453,7 @@ async def main():
     
     # 创建客户端
     url = f"ws://{host}:{port}/"
-    client = TickSubscriber(url)
+    client = DataSubscriber(url)
     
     try:
         # 初始化存储引擎
