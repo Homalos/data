@@ -20,7 +20,7 @@ except ImportError:
     from src.utils import GlobalConfig
 
 
-async def run(config_file_path: str, app_type: str):
+async def run(config_file_path: str, app_type: str) -> None:
     """
     运行CTP应用服务
 
