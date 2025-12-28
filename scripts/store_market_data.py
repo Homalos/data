@@ -37,7 +37,7 @@ class DataSubscriber(object):
         self.request_id: int = 0
         self.tick_count: int = 0
         self.last_log_time = 0
-        self.start_time = 0
+        self.start_time: float = 0
         
         # CSV存储引擎
         self.tick_storage = None
@@ -123,8 +123,8 @@ class DataSubscriber(object):
             self.ws = await websockets.connect(
                 self.url,
                 max_size=10 * 1024 * 1024,  # 10MB
-                ping_interval=None,  # 禁用 websockets 库的自动 ping
-                ping_timeout=None    # 禁用 websockets 库的 ping 超时
+                ping_interval=None,         # 禁用 websockets 库的自动 ping
+                ping_timeout=None           # 禁用 websockets 库的 ping 超时
             )
             
             logger.info("连接成功")
