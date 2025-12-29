@@ -161,7 +161,6 @@ def build_order_to_dict(order_field) -> dict:
         "IPAddress": order_field.IPAddress
     }
 
-
 def extract_login_response_fields(rsp_user_login_field) -> dict:
     """提取登录响应字段为字典
 
