@@ -332,7 +332,7 @@ class MdGateway(mdapi.CThostFtdcMdSpi):
             "ActionDay": depth_marketdata.ActionDay,
             "BandingLowerPrice": MathHelper.adjust_price(depth_marketdata.BandingLowerPrice),
             "BandingUpperPrice": MathHelper.adjust_price(depth_marketdata.BandingUpperPrice)
-            }
+        }
 
         # 构建响应并回调
         response = {
@@ -383,7 +383,7 @@ class MdGateway(mdapi.CThostFtdcMdSpi):
         """
         instrument_ids = request[Constant.InstrumentID]
         instrument_ids = list(map(lambda i: i.encode(), instrument_ids))
-        logger.debug(f"subscribe data for {instrument_ids}")
+        logger.debug(f"Subscribe data for {instrument_ids}")
         ret = self._api.SubscribeMarketData(instrument_ids, len(instrument_ids))
         self.method_called(Constant.OnRspSubMarketData, ret)
 
@@ -402,6 +402,6 @@ class MdGateway(mdapi.CThostFtdcMdSpi):
         """
         instrument_ids = request[Constant.InstrumentID]
         instrument_ids = list(map(lambda i: i.encode(), instrument_ids))
-        logger.debug(f"unsubscribe data for {instrument_ids}")
+        logger.debug(f"UnSubscribe data for {instrument_ids}")
         ret = self._api.UnSubscribeMarketData(instrument_ids, len(instrument_ids))
         self.method_called(Constant.OnRspUnSubMarketData, ret)

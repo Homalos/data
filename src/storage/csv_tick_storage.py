@@ -5,13 +5,13 @@ CSV Tick数据存储引擎
 按交易日和合约分文件存储
 """
 import asyncio
-import csv
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
-from datetime import datetime
-from loguru import logger
+
 import aiofiles
 import aiofiles.os
+from loguru import logger
 
 
 class CSVTickStorage:
