@@ -164,13 +164,13 @@ def build_order_to_dict(order_field) -> dict:
 
 def extract_login_response_fields(rsp_user_login_field) -> dict:
     """提取登录响应字段为字典
-    
+
     将CTP用户登录响应结构体的所有字段提取为Python字典，
     避免CTP对象生命周期问题。
-    
+
     Args:
         rsp_user_login_field: CTP用户登录响应结构体
-        
+
     Returns:
         dict: 包含所有登录响应字段的字典
     """
@@ -191,13 +191,13 @@ def extract_login_response_fields(rsp_user_login_field) -> dict:
     }
 
 
-class ReconnectionController:
+class ReconnectionController(object):
     """CTP 客户端重连控制器"""
-    
+
     def __init__(self, max_attempts: int = 5, interval: float = 10.0, client_type: str = "CTP"):
         """
         初始化重连控制器
-        
+
         Args:
             max_attempts: 最大重连尝试次数
             interval: 重连间隔阈值（秒）
@@ -208,9 +208,21 @@ class ReconnectionController:
         self.last_connect_time: float = 0.0
         self.reconnect_interval: float = interval
         self.client_type: str = client_type
-    
     def check_on_connected(self, callback, message_type: str, logger, current_time: float) -> bool:
-        """在 OnFrontConnected 中检查重连状态"""
+        """检查重连状态并处理重连逻辑。
+
+        在 OnFrontConnected 回调中调用，用于检查是否超过重连间隔时间，
+        并根据重连次数决定是否继续重连或返回错误。
+
+        Args:
+            callback: 回调函数，用于发送错误消息给调用者
+            message_type: 消息类型字符串，用于错误消息构造
+            logger: 日志记录器，用于记录重连相关信息
+            current_time: 当前时间戳，用于判断是否超过重连间隔
+
+        Returns:
+            bool: 如果可以继续连接返回True，超过最大重连次数返回False
+        """
         if current_time - self.last_connect_time < self.reconnect_interval:
             self.reconnect_count += 1
             if self.reconnect_count > self.max_reconnect_attempts:
@@ -227,9 +239,20 @@ class ReconnectionController:
             self.reconnect_count = 0
         self.last_connect_time = current_time
         return True
-    
+
     def track_on_disconnected(self, reason: int, callback, logger, current_time: float) -> None:
-        """在 OnFrontDisconnected 中跟踪断开次数"""
+        """
+        在 OnFrontDisconnected 中跟踪断开次数。
+
+        根据断开连接的时间间隔来重置或增加重连计数器，
+        当达到最大重连次数时触发回调函数。
+
+        Args:
+            reason: 断开连接的错误码
+            callback: 达到最大重连次数时的回调函数
+            logger: 日志记录器
+            current_time: 当前时间戳
+        """
         if self.last_connect_time == 0:
             self.reconnect_count = 1
             logger.debug("First disconnection, count=1")
