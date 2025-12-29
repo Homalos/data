@@ -7,19 +7,17 @@
 @Author     : Lumosylva
 @Email      : donnymoving@gmail.com
 @Software   : PyCharm
-@Description: 行情gateway (继承 CThostFtdcMdSpi)
+@Description: 行情 gateway (继承 CThostFtdcMdSpi)
 """
 import time
 import uuid
-import asyncio
-from typing import Callable, Any, Optional
+from typing import Callable, Any
 
-from ..ctp import thostmduserapi as mdapi
-
+from .client_helper import ReconnectionController
 from ..constants import CallError
 from ..constants import MdConstant as Constant
+from ..ctp import thostmduserapi as mdapi
 from ..utils import CTPObjectHelper, GlobalConfig, MathHelper, logger
-from .client_helper import ReconnectionController
 
 
 class MdGateway(mdapi.CThostFtdcMdSpi):
@@ -288,54 +286,52 @@ class MdGateway(mdapi.CThostFtdcMdSpi):
         """
         logger.debug(f"Receive depth market data: {depth_marketdata.InstrumentID}")
         depth_data = {
-            "ActionDay": depth_marketdata.ActionDay,
-            "AskPrice1": MathHelper.adjust_price(depth_marketdata.AskPrice1),
-            "AskPrice2": MathHelper.adjust_price(depth_marketdata.AskPrice2),
-            "AskPrice3": MathHelper.adjust_price(depth_marketdata.AskPrice3),
-            "AskPrice4": MathHelper.adjust_price(depth_marketdata.AskPrice4),
-            "AskPrice5": MathHelper.adjust_price(depth_marketdata.AskPrice5),
-            "AskVolume1": depth_marketdata.AskVolume1,
-            "AskVolume2": depth_marketdata.AskVolume2,
-            "AskVolume3": depth_marketdata.AskVolume3,
-            "AskVolume4": depth_marketdata.AskVolume4,
-            "AskVolume5": depth_marketdata.AskVolume5,
-            "AveragePrice": MathHelper.adjust_price(depth_marketdata.AveragePrice),
-            "BandingLowerPrice": MathHelper.adjust_price(depth_marketdata.BandingLowerPrice),
-            "BandingUpperPrice": MathHelper.adjust_price(depth_marketdata.BandingUpperPrice),
-            "BidPrice1": MathHelper.adjust_price(depth_marketdata.BidPrice1),
-            "BidPrice2": MathHelper.adjust_price(depth_marketdata.BidPrice2),
-            "BidPrice3": MathHelper.adjust_price(depth_marketdata.BidPrice3),
-            "BidPrice4": MathHelper.adjust_price(depth_marketdata.BidPrice4),
-            "BidPrice5": MathHelper.adjust_price( depth_marketdata.BidPrice5),
-            "BidVolume1": depth_marketdata.BidVolume1,
-            "BidVolume2": depth_marketdata.BidVolume2,
-            "BidVolume3": depth_marketdata.BidVolume3,
-            "BidVolume4": depth_marketdata.BidVolume4,
-            "BidVolume5": depth_marketdata.BidVolume5,
-            "ClosePrice": MathHelper.adjust_price(depth_marketdata.ClosePrice),
-            "CurrDelta": depth_marketdata.CurrDelta,
+            "TradingDay": depth_marketdata.TradingDay,
+            "InstrumentID": depth_marketdata.InstrumentID,
             "ExchangeID": depth_marketdata.ExchangeID,
             "ExchangeInstID": depth_marketdata.ExchangeInstID,
-            "HighestPrice": MathHelper.adjust_price(depth_marketdata.HighestPrice),
-            "InstrumentID": depth_marketdata.InstrumentID,
             "LastPrice": MathHelper.adjust_price(depth_marketdata.LastPrice),
-            "LowerLimitPrice": MathHelper.adjust_price(depth_marketdata.LowerLimitPrice),
-            "LowestPrice": MathHelper.adjust_price(depth_marketdata.LowestPrice),
-            "OpenInterest": depth_marketdata.OpenInterest,
-            "OpenPrice": MathHelper.adjust_price(depth_marketdata.OpenPrice),
-            "PreClosePrice": MathHelper.adjust_price(depth_marketdata.PreClosePrice),
-            "PreDelta": depth_marketdata.PreDelta,
-            "PreOpenInterest": depth_marketdata.PreOpenInterest,
             "PreSettlementPrice": MathHelper.adjust_price(depth_marketdata.PreSettlementPrice),
-            "SettlementPrice": MathHelper.adjust_price(depth_marketdata.SettlementPrice),
-            "TradingDay": depth_marketdata.TradingDay,
-            "Turnover": depth_marketdata.Turnover,
-            "UpdateMillisec": depth_marketdata.UpdateMillisec,
-            "UpdateTime": depth_marketdata.UpdateTime,
-            "UpperLimitPrice": MathHelper.adjust_price(depth_marketdata.UpperLimitPrice),
+            "PreClosePrice": MathHelper.adjust_price(depth_marketdata.PreClosePrice),
+            "PreOpenInterest": depth_marketdata.PreOpenInterest,
+            "OpenPrice": MathHelper.adjust_price(depth_marketdata.OpenPrice),
+            "HighestPrice": MathHelper.adjust_price(depth_marketdata.HighestPrice),
+            "LowestPrice": MathHelper.adjust_price(depth_marketdata.LowestPrice),
             "Volume": depth_marketdata.Volume,
-            "reserve1": depth_marketdata.reserve1,
-            "reserve2": depth_marketdata.reserve2
+            "Turnover": depth_marketdata.Turnover,
+            "OpenInterest": depth_marketdata.OpenInterest,
+            "ClosePrice": MathHelper.adjust_price(depth_marketdata.ClosePrice),
+            "SettlementPrice": MathHelper.adjust_price(depth_marketdata.SettlementPrice),
+            "UpperLimitPrice": MathHelper.adjust_price(depth_marketdata.UpperLimitPrice),
+            "LowerLimitPrice": MathHelper.adjust_price(depth_marketdata.LowerLimitPrice),
+            "PreDelta": depth_marketdata.PreDelta,
+            "CurrDelta": depth_marketdata.CurrDelta,
+            "UpdateTime": depth_marketdata.UpdateTime,
+            "UpdateMillisec": depth_marketdata.UpdateMillisec,
+            "BidPrice1": MathHelper.adjust_price(depth_marketdata.BidPrice1),
+            "BidVolume1": depth_marketdata.BidVolume1,
+            "AskPrice1": MathHelper.adjust_price(depth_marketdata.AskPrice1),
+            "AskVolume1": depth_marketdata.AskVolume1,
+            "BidPrice2": MathHelper.adjust_price(depth_marketdata.BidPrice2),
+            "BidVolume2": depth_marketdata.BidVolume2,
+            "AskPrice2": MathHelper.adjust_price(depth_marketdata.AskPrice2),
+            "AskVolume2": depth_marketdata.AskVolume2,
+            "BidPrice3": MathHelper.adjust_price(depth_marketdata.BidPrice3),
+            "BidVolume3": depth_marketdata.BidVolume3,
+            "AskPrice3": MathHelper.adjust_price(depth_marketdata.AskPrice3),
+            "AskVolume3": depth_marketdata.AskVolume3,
+            "BidPrice4": MathHelper.adjust_price(depth_marketdata.BidPrice4),
+            "BidVolume4": depth_marketdata.BidVolume4,
+            "AskPrice4": MathHelper.adjust_price(depth_marketdata.AskPrice4),
+            "AskVolume4": depth_marketdata.AskVolume4,
+            "BidPrice5": MathHelper.adjust_price(depth_marketdata.BidPrice5),
+            "BidVolume5": depth_marketdata.BidVolume5,
+            "AskPrice5": MathHelper.adjust_price(depth_marketdata.AskPrice5),
+            "AskVolume5": depth_marketdata.AskVolume5,
+            "AveragePrice": MathHelper.adjust_price(depth_marketdata.AveragePrice),
+            "ActionDay": depth_marketdata.ActionDay,
+            "BandingLowerPrice": MathHelper.adjust_price(depth_marketdata.BandingLowerPrice),
+            "BandingUpperPrice": MathHelper.adjust_price(depth_marketdata.BandingUpperPrice)
             }
 
         # 构建响应并回调

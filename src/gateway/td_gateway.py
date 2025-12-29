@@ -7,7 +7,7 @@
 @Author     : Lumosylva
 @Email      : donnymoving@gmail.com
 @Software   : PyCharm
-@Description: 交易gateway (继承 CThostFtdcTraderSpi)
+@Description: 交易 gateway (继承 CThostFtdcTraderSpi)
 """
 import time
 from typing import Callable, Any
@@ -35,12 +35,11 @@ class TdGateway(tdapi.CThostFtdcTraderSpi):
         self._api: tdapi.CThostFtdcTraderApi | None = None
         self._connected: bool = False
         self._request_id: int = 0  # 请求ID
-        # Reconnection control
-        self._reconnection_ctrl = ReconnectionController(max_attempts=5, interval=10.0, client_type="Td")
-        # Settlement confirmation state
+        # 重连控制器
+        self._reconnection_ctrl = ReconnectionController(max_attempts=5, interval=5.0, client_type="Td")
         self._pending_login_response: dict | None = None
         self._settlement_confirmed: bool = False
-        logger.set_default_tag("tdClient")
+        logger.set_default_tag("TdGateway")
         logger.info(f"Td front_address: {self._front_address}, broker_id: {self._broker_id}, "
                     f"auth_code: {self._auth_code}, app_id: {self._app_id}, user_id: {self._user_id}")
 
@@ -1488,7 +1487,7 @@ class TdGateway(tdapi.CThostFtdcTraderSpi):
                 "TradingRole": trade_field.TradingRole,
                 "UserID": trade_field.UserID,
                 "Volume": trade_field.Volume
-                }
+            }
         response[Constant.Trade] = qry_trade
         self.rsp_callback(response)
 
@@ -1582,7 +1581,7 @@ class TdGateway(tdapi.CThostFtdcTraderSpi):
                 "UseMargin": investor_position_field.UseMargin,
                 "YdPosition": investor_position_field.YdPosition,
                 "YdStrikeFrozen": investor_position_field.YdStrikeFrozen
-                }
+            }
         response[Constant.InvestorPosition] = qry_investor_position
         self.rsp_callback(response)
 
@@ -1674,7 +1673,7 @@ class TdGateway(tdapi.CThostFtdcTraderSpi):
                 "TradingDay": trading_account_field.TradingDay,
                 "Withdraw": trading_account_field.Withdraw,
                 "WithdrawQuota": trading_account_field.WithdrawQuota
-                }
+            }
         response[Constant.TradingAccount] = qry_trading_account
         self.rsp_callback(response)
 
@@ -1730,7 +1729,7 @@ class TdGateway(tdapi.CThostFtdcTraderSpi):
                 "Mobile": investor_field.Mobile,
                 "OpenDate": investor_field.OpenDate,
                 "Telephone": investor_field.Telephone
-                }
+            }
         response[Constant.Investor] = qry_investor
         self.rsp_callback(response)
 
@@ -1786,7 +1785,7 @@ class TdGateway(tdapi.CThostFtdcTraderSpi):
                 "InvestUnitID": trading_code_field.InvestUnitID,
                 "InvestorID": trading_code_field.InvestorID,
                 "IsActive": trading_code_field.IsActive
-                }
+            }
         response[Constant.TradingCode] = qry_trading_code
         self.rsp_callback(response)
 
@@ -1848,7 +1847,7 @@ class TdGateway(tdapi.CThostFtdcTraderSpi):
                 "LongMarginRatioByVolume": instrument_margin_rate.LongMarginRatioByVolume,
                 "ShortMarginRatioByMoney": instrument_margin_rate.ShortMarginRatioByMoney,
                 "ShortMarginRatioByVolume": instrument_margin_rate.ShortMarginRatioByVolume
-                }
+            }
         response[Constant.InstrumentMarginRate] = qry_instrument_margin_rate
         self.rsp_callback(response)
 
@@ -1909,6 +1908,6 @@ class TdGateway(tdapi.CThostFtdcTraderSpi):
                 "InvestorRange": instrument_commission_rate_field.InvestorRange,
                 "OpenRatioByMoney": instrument_commission_rate_field.OpenRatioByMoney,
                 "OpenRatioByVolume": instrument_commission_rate_field.OpenRatioByVolume
-                }
+            }
         response[Constant.InstrumentCommissionRate] = qry_instrument_commission_rate
         self.rsp_callback(response)
