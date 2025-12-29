@@ -1,8 +1,8 @@
 ﻿#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-@ProjectName: homalos-webctp
-@FileName   : client_helper.py
+@ProjectName: homalos-data
+@FileName   : gateway_helper.py
 @Date       : 2025/12/5 10:40
 @Author     : Lumosylva
 @Email      : donnymoving@gmail.com

@@ -12,7 +12,7 @@
 import time
 from typing import Callable, Any
 
-from .client_helper import build_order_to_dict, build_order_insert_to_dict, ReconnectionController, extract_login_response_fields
+from .gateway_helper import build_order_to_dict, build_order_insert_to_dict, ReconnectionController, extract_login_response_fields
 from ..ctp import thosttraderapi as tdapi
 
 from ..constants import CallError

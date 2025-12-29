@@ -13,7 +13,7 @@ import time
 import uuid
 from typing import Callable, Any
 
-from .client_helper import ReconnectionController
+from .gateway_helper import ReconnectionController
 from ..constants import CallError
 from ..constants import MdConstant as Constant
 from ..ctp import thostmduserapi as mdapi
