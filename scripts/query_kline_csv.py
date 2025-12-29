@@ -22,10 +22,10 @@ def query_kline(trading_day: str, period: str, instrument_id: str, limit: int = 
     file_path = Path(f"data/klines/{trading_day}/{period}/{instrument_id}.csv")
     
     if not file_path.exists():
-        print(f"❌ 文件不存在: {file_path}")
+        print(f"文件不存在: {file_path}")
         return
     
-    print(f"📊 查询K线数据: {file_path}")
+    print(f"查询K线数据: {file_path}")
     print("="*80)
     
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -64,16 +64,16 @@ def list_contracts(trading_day: str, period: str):
     base_dir = Path(f"data/klines/{trading_day}/{period}")
     
     if not base_dir.exists():
-        print(f"❌ 目录不存在: {base_dir}")
+        print(f"目录不存在: {base_dir}")
         return
     
     csv_files = list(base_dir.glob("*.csv"))
     
     if not csv_files:
-        print(f"❌ 没有找到CSV文件: {base_dir}")
+        print(f"没有找到CSV文件: {base_dir}")
         return
     
-    print(f"📁 {trading_day} / {period}")
+    print(f"{trading_day} / {period}")
     print("="*60)
     
     for csv_file in sorted(csv_files):
@@ -93,16 +93,16 @@ def list_trading_days():
     base_dir = Path("data/klines")
     
     if not base_dir.exists():
-        print(f"❌ 目录不存在: {base_dir}")
+        print(f"目录不存在: {base_dir}")
         return
     
     trading_days = [d.name for d in base_dir.iterdir() if d.is_dir()]
     
     if not trading_days:
-        print("❌ 没有找到交易日数据")
+        print("没有找到交易日数据")
         return
     
-    print("📅 可用的交易日:")
+    print("可用的交易日:")
     print("="*60)
     
     for day in sorted(trading_days):
