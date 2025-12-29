@@ -19,7 +19,7 @@ tasks:
     type: service
     config_file: "./config/config_td.yaml"
     app_type: td
-    cron: "38 0 * * 0-6"  # 周一到周五 08:30
+    cron: "30 8 * * 1-5"  # 周一到周五 08:30
     enabled: true
 
   # 启动行情服务
