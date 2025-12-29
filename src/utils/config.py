@@ -29,6 +29,37 @@ class MetricsConfig:
 
 
 @dataclass
+class AlertsConfig:
+    """告警配置"""
+    # 延迟告警阈值（毫秒）
+    order_p95_threshold: float = 150.0
+    market_p95_threshold: float = 80.0
+    # Redis 告警阈值
+    redis_hit_rate_threshold: float = 0.65
+    # 系统资源告警阈值
+    cpu_threshold: float = 80.0
+    memory_threshold: float = 80.0
+    # 告警频率控制
+    min_interval: int = 300
+
+
+@dataclass
+class CacheConfig:
+    """Redis 缓存配置（默认禁用）"""
+    enabled: bool = False
+    host: str = "localhost"
+    port: int = 6379
+    password: Optional[str] = None
+    db: int = 0
+    max_connections: int = 50
+    socket_timeout: float = 2.0
+    socket_connect_timeout: float = 2.0
+    market_snapshot_ttl: int = 30
+    market_tick_ttl: int = 5
+    order_ttl: int = 86400
+
+
+@dataclass
 class InstrumentsConfig:
     """合约管理配置"""
     cache_path: str = "./data/instruments.json"
@@ -79,7 +110,9 @@ class GlobalConfig(object):
     HeartbeatTimeout: float
 
     # 配置对象
+    Cache: CacheConfig
     Metrics: MetricsConfig
+    Alerts: AlertsConfig
     Storage: StorageConfig
 
     @classmethod
@@ -156,6 +189,12 @@ class GlobalConfig(object):
                     )
                 ),
             )
+
+            # 加载告警配置（使用默认值）
+            cls.Alerts = AlertsConfig()
+
+            # 加载缓存配置（默认禁用）
+            cls.Cache = CacheConfig()
 
             # 加载存储配置
             storage_config = config.get("Storage", {})
