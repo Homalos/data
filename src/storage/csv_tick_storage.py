@@ -34,33 +34,38 @@ class CSVTickStorage:
         
         # CSV字段顺序
         self._csv_fields = [
-            'timestamp',
-            'trading_day',
-            'instrument_id',
-            'exchange_id',
-            'last_price',
-            'volume',
-            'turnover',
-            'open_interest',
-            'bid_price1', 'bid_volume1', 'ask_price1', 'ask_volume1',
-            'bid_price2', 'bid_volume2', 'ask_price2', 'ask_volume2',
-            'bid_price3', 'bid_volume3', 'ask_price3', 'ask_volume3',
-            'bid_price4', 'bid_volume4', 'ask_price4', 'ask_volume4',
-            'bid_price5', 'bid_volume5', 'ask_price5', 'ask_volume5',
-            'open_price',
-            'high_price',
-            'low_price',
-            'close_price',
-            'pre_settlement_price',
-            'pre_close_price',
-            'pre_open_interest',
-            'settlement_price',
-            'upper_limit_price',
-            'lower_limit_price',
-            'average_price',
-            'update_time',
-            'update_millisec',
-            'action_day',
+            'Timestamp',
+            'TradingDay',
+            'InstrumentID',
+            'ExchangeID',
+            'ExchangeInstID',
+            'LastPrice',
+            'PreSettlementPrice',
+            'PreClosePrice',
+            'PreOpenInterest',
+            'OpenPrice',
+            'HighestPrice',
+            'LowestPrice',
+            'Volume',
+            'Turnover',
+            'OpenInterest',
+            'ClosePrice',
+            'SettlementPrice',
+            'UpperLimitPrice',
+            'LowerLimitPrice',
+            'PreDelta',
+            'CurrDelta',
+            'UpdateTime',
+            'UpdateMillisec',
+            'BidPrice1', 'BidVolume1', 'AskPrice1', 'AskVolume1',
+            'BidPrice2', 'BidVolume2', 'AskPrice2', 'AskVolume2',
+            'BidPrice3', 'BidVolume3', 'AskPrice3', 'AskVolume3',
+            'BidPrice4', 'BidVolume4', 'AskPrice4', 'AskVolume4',
+            'BidPrice5', 'BidVolume5', 'AskPrice5', 'AskVolume5',
+            'AveragePrice',
+            'ActionDay',
+            'BandingUpperPrice',
+            'BandingLowerPrice'
         ]
     
     async def initialize(self):
@@ -140,58 +145,61 @@ class CSVTickStorage:
         
         # 构建ISO 8601时间戳
         if update_time and trading_day:
-            try:
-                # 格式: 2025-12-27T09:30:15.500Z
-                timestamp = f"{trading_day[:4]}-{trading_day[4:6]}-{trading_day[6:8]}T{update_time}.{update_millisec:03d}Z"
-            except:
-                timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+            # 格式: 2025-12-27T09:30:15.500Z
+            timestamp = f"{trading_day[:4]}-{trading_day[4:6]}-{trading_day[6:8]}T{update_time}.{update_millisec:03d}Z"
         else:
             timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
-        
+            logger.warning(f"Tick数据缺少交易日或更新时间: {tick_data}，使用当前时间戳代替")
+
         # 映射字段
         csv_row = {
-            'timestamp': timestamp,
-            'trading_day': tick_data.get('TradingDay', ''),
-            'instrument_id': tick_data.get('InstrumentID', ''),
-            'exchange_id': tick_data.get('ExchangeID', ''),
-            'last_price': tick_data.get('LastPrice', 0.0),
-            'volume': tick_data.get('Volume', 0),
-            'turnover': tick_data.get('Turnover', 0.0),
-            'open_interest': tick_data.get('OpenInterest', 0),
-            'bid_price1': tick_data.get('BidPrice1', 0.0),
-            'bid_volume1': tick_data.get('BidVolume1', 0),
-            'ask_price1': tick_data.get('AskPrice1', 0.0),
-            'ask_volume1': tick_data.get('AskVolume1', 0),
-            'bid_price2': tick_data.get('BidPrice2', 0.0),
-            'bid_volume2': tick_data.get('BidVolume2', 0),
-            'ask_price2': tick_data.get('AskPrice2', 0.0),
-            'ask_volume2': tick_data.get('AskVolume2', 0),
-            'bid_price3': tick_data.get('BidPrice3', 0.0),
-            'bid_volume3': tick_data.get('BidVolume3', 0),
-            'ask_price3': tick_data.get('AskPrice3', 0.0),
-            'ask_volume3': tick_data.get('AskVolume3', 0),
-            'bid_price4': tick_data.get('BidPrice4', 0.0),
-            'bid_volume4': tick_data.get('BidVolume4', 0),
-            'ask_price4': tick_data.get('AskPrice4', 0.0),
-            'ask_volume4': tick_data.get('AskVolume4', 0),
-            'bid_price5': tick_data.get('BidPrice5', 0.0),
-            'bid_volume5': tick_data.get('BidVolume5', 0),
-            'ask_price5': tick_data.get('AskPrice5', 0.0),
-            'ask_volume5': tick_data.get('AskVolume5', 0),
-            'open_price': tick_data.get('OpenPrice', 0.0),
-            'high_price': tick_data.get('HighestPrice', 0.0),
-            'low_price': tick_data.get('LowestPrice', 0.0),
-            'close_price': tick_data.get('ClosePrice', 0.0),
-            'pre_settlement_price': tick_data.get('PreSettlementPrice', 0.0),
-            'pre_close_price': tick_data.get('PreClosePrice', 0.0),
-            'pre_open_interest': tick_data.get('PreOpenInterest', 0),
-            'settlement_price': tick_data.get('SettlementPrice', 0.0),
-            'upper_limit_price': tick_data.get('UpperLimitPrice', 0.0),
-            'lower_limit_price': tick_data.get('LowerLimitPrice', 0.0),
-            'average_price': tick_data.get('AveragePrice', 0.0),
-            'update_time': update_time,
-            'update_millisec': update_millisec,
-            'action_day': tick_data.get('ActionDay', ''),
+            'Timestamp': timestamp,
+            'TradingDay': tick_data.get('TradingDay', ''),
+            'InstrumentID': tick_data.get('InstrumentID', ''),
+            'ExchangeID': tick_data.get('ExchangeID', ''),
+            'ExchangeInstID': tick_data.get('ExchangeInstID', ''),
+            'LastPrice': tick_data.get('LastPrice', 0.0),
+            'PreSettlementPrice': tick_data.get('PreSettlementPrice', 0.0),
+            'PreClosePrice': tick_data.get('PreClosePrice', 0.0),
+            'PreOpenInterest': tick_data.get('PreOpenInterest', 0),
+            'OpenPrice': tick_data.get('OpenPrice', 0.0),
+            'HighestPrice': tick_data.get('HighestPrice', 0.0),
+            'LowestPrice': tick_data.get('LowestPrice', 0.0),
+            'Volume': tick_data.get('Volume', 0),
+            'Turnover': tick_data.get('Turnover', 0.0),
+            'OpenInterest': tick_data.get('OpenInterest', 0),
+            'ClosePrice': tick_data.get('ClosePrice', 0.0),
+            'SettlementPrice': tick_data.get('SettlementPrice', 0.0),
+            'UpperLimitPrice': tick_data.get('UpperLimitPrice', 0.0),
+            'LowerLimitPrice': tick_data.get('LowerLimitPrice', 0.0),
+            'PreDelta': tick_data.get('PreDelta', 0.0),
+            'CurrDelta': tick_data.get('CurrDelta', 0.0),
+            'UpdateTime': update_time,
+            'UpdateMillisec': update_millisec,
+            'BidPrice1': tick_data.get('BidPrice1', 0.0),
+            'BidVolume1': tick_data.get('BidVolume1', 0),
+            'AskPrice1': tick_data.get('AskPrice1', 0.0),
+            'AskVolume1': tick_data.get('AskVolume1', 0),
+            'BidPrice2': tick_data.get('BidPrice2', 0.0),
+            'BidVolume2': tick_data.get('BidVolume2', 0),
+            'AskPrice2': tick_data.get('AskPrice2', 0.0),
+            'AskVolume2': tick_data.get('AskVolume2', 0),
+            'BidPrice3': tick_data.get('BidPrice3', 0.0),
+            'BidVolume3': tick_data.get('BidVolume3', 0),
+            'AskPrice3': tick_data.get('AskPrice3', 0.0),
+            'AskVolume3': tick_data.get('AskVolume3', 0),
+            'BidPrice4': tick_data.get('BidPrice4', 0.0),
+            'BidVolume4': tick_data.get('BidVolume4', 0),
+            'AskPrice4': tick_data.get('AskPrice4', 0.0),
+            'AskVolume4': tick_data.get('AskVolume4', 0),
+            'BidPrice5': tick_data.get('BidPrice5', 0.0),
+            'BidVolume5': tick_data.get('BidVolume5', 0),
+            'AskPrice5': tick_data.get('AskPrice5', 0.0),
+            'AskVolume5': tick_data.get('AskVolume5', 0),
+            'AveragePrice': tick_data.get('AveragePrice', 0.0),
+            'ActionDay': tick_data.get('ActionDay', ''),
+            'BandingUpperPrice': tick_data.get('BandingUpperPrice', 0.0),
+            'BandingLowerPrice': tick_data.get('BandingLowerPrice', 0.0)
         }
         
         return csv_row
@@ -269,10 +277,10 @@ class CSVTickStorage:
                     line = ','.join(values) + '\n'
                     await f.write(line)
             
-            logger.debug(f"✅ 写入CSV成功: {file_path}, {len(data_to_write)}条")
+            logger.debug(f"写入CSV成功: {file_path}, {len(data_to_write)}条")
             
         except Exception as e:
-            logger.error(f"❌ 写入CSV失败: {file_path}, {e}")
+            logger.error(f"写入CSV失败: {file_path}, {e}")
             # 将数据放回缓冲区
             async with self._buffer_locks[file_key]:
                 self._write_buffers[file_key].extend(data_to_write)
