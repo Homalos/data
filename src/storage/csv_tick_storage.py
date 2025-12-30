@@ -54,7 +54,7 @@ class CSVTickStorage(BaseCSVStorage):
     ]
 
     def __init__(self, base_path: str = "./data/ticks"):
-        super().__init__(base_path, flush_interval=1.0)
+        super().__init__(base_path, flush_interval=1.0, buffer_size=500)
 
     @property
     def csv_fields(self) -> List[str]:
@@ -147,14 +147,8 @@ class CSVTickStorage(BaseCSVStorage):
             'BandingLowerPrice': tick_data.get('BandingLowerPrice', 0.0)
         }
 
-    async def _flush_buffer(self, file_key: str) -> None:
+    async def _flush_buffer(self, file_key: str, data_to_write: List[Dict[str, Any]]) -> None:
         """刷新单个缓冲区"""
-        async with self._buffer_locks[file_key]:
-            if file_key not in self._write_buffers or not self._write_buffers[file_key]:
-                return
-            data_to_write = self._write_buffers[file_key]
-            self._write_buffers[file_key] = []
-
         # 解析文件key: trading_day_instrument_id
         parts = file_key.split('_', 1)
         if len(parts) != 2:
@@ -168,4 +162,4 @@ class CSVTickStorage(BaseCSVStorage):
         await aiofiles.os.makedirs(day_dir, exist_ok=True)
 
         file_path = day_dir / f"{instrument_id}.csv"
-        await self._write_csv_file(file_path, data_to_write, file_key)
+        await self._write_csv_file(file_path, data_to_write)
