@@ -5,7 +5,6 @@ CSV Tick数据存储引擎
 按交易日和合约分文件存储
 存储路径: data/ticks/{交易日}/{合约代码}.csv
 """
-from datetime import datetime
 from typing import Dict, Any, List
 
 import aiofiles.os

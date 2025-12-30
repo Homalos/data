@@ -366,7 +366,7 @@ def load_instruments_from_json() -> list:
 async def main():
     """主函数"""
     logger.info("=" * 60)
-    logger.info("期货合约Tick数据订阅与存储")
+    logger.info("期货合约行情数据订阅与存储")
     logger.info("=" * 60)
     
     # 尝试加载 .env 文件
@@ -474,7 +474,7 @@ async def main():
         # 订阅合约
         if not await client.subscribe_market_data(instruments):
             return
-        
+
         # 监听并存储行情数据
         tick_count = await client.listen_and_store()
         
