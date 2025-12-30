@@ -29,6 +29,17 @@ class MetricsConfig:
 
 
 @dataclass
+class TradingHoursConfig:
+    """交易时间配置"""
+    day_sessions: List[List[str]] = field(
+        default_factory=lambda: [["09:00:00", "10:15:00"], ["10:30:00", "11:30:00"], ["13:30:00", "15:00:00"]]
+    )
+    night_sessions: List[List[str]] = field(
+        default_factory=lambda: [["21:00:00", "23:00:00"], ["23:00:00", "02:30:00"]]
+    )
+
+
+@dataclass
 class AlertsConfig:
     """告警配置"""
     # 延迟告警阈值（毫秒）
@@ -114,6 +125,7 @@ class GlobalConfig(object):
     Metrics: MetricsConfig
     Alerts: AlertsConfig
     Storage: StorageConfig
+    TradingHours: TradingHoursConfig
 
     @classmethod
     def load_config(cls, config_file_path: str):
@@ -195,6 +207,13 @@ class GlobalConfig(object):
 
             # 加载缓存配置（默认禁用）
             cls.Cache = CacheConfig()
+
+            # 加载交易时间配置
+            trading_hours_config = config.get("TradingHours", {})
+            cls.TradingHours = TradingHoursConfig(
+                day_sessions=trading_hours_config.get("Day", [["09:00:00", "10:15:00"], ["10:30:00", "11:30:00"], ["13:30:00", "15:00:00"]]),
+                night_sessions=trading_hours_config.get("Night", [["21:00:00", "23:00:00"], ["23:00:00", "02:30:00"]]),
+            )
 
             # 加载存储配置
             storage_config = config.get("Storage", {})
