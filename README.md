@@ -54,13 +54,16 @@ CTP_PASSWORD=你的密码
 ### 3. 运行
 
 ```bash
-# 更新合约信息
-python scripts/update_instruments.py
+# 启动交易服务
+python main.py --config=./config/config_td.yaml --app_type=td
 
 # 启动行情服务
 python main.py --config=./config/config_md.yaml --app_type=md
 
-# 订阅并存储行情数据
+# 更新合约信息(依赖于交易服务)
+python scripts/update_instruments.py
+
+# 订阅并存储行情数据(依赖于行情服务)
 python scripts/store_market_data.py
 ```
 
