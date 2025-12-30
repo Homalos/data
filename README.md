@@ -72,10 +72,10 @@ python scripts/store_market_data.py
 或者
 
 ```bash
-# 启动交易服务后启动更新合约信息
+# 同时启动交易服务和更新合约信息
 start_update_instruments.bat
 
-# 启动行情服务后启动存储行情数据
+# 同时启动行情服务和存储行情数据
 start_store_market_data.bat
 ```
 
