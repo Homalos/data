@@ -19,9 +19,11 @@ from typing import Dict, List, Optional, Any
 try:
     from .log import logger
     from .config import MetricsConfig, GlobalConfig, AlertsConfig
+    from .datetime_helper import DateTimeHelper
 except ImportError:
     from log import logger
     from config import MetricsConfig, GlobalConfig, AlertsConfig
+    from datetime_helper import DateTimeHelper
 
 
 class MetricsCollector:
@@ -72,6 +74,11 @@ class MetricsCollector:
         self.config = config if config is not None else GlobalConfig.Metrics
         self.alerts_config = alerts_config if alerts_config is not None else GlobalConfig.Alerts
         
+        # 交易时间配置
+        self._trading_hours = None
+        if hasattr(GlobalConfig, 'TradingHours'):
+            self._trading_hours = GlobalConfig.TradingHours
+        
         # 告警频率控制：记录上次告警时间
         self._last_alert_time: Dict[str, float] = {}
         
@@ -101,6 +108,10 @@ class MetricsCollector:
         """
         # 检查是否启用
         if not self.config.enabled:
+            return
+        
+        # 非交易时段不记录延迟（避免休市期间的无效数据）
+        if not self._is_trading_time():
             return
         
         # 采样率检查
@@ -270,9 +281,9 @@ class MetricsCollector:
                     p95_value = percentiles[0.95]
                     report_lines.append(f"    P95: {p95_value:.2f} ms")
                     
-                    # 延迟告警检查：P95 超过阈值
+                    # 延迟告警检查：P95 超过阈值（仅在交易时段内告警）
                     threshold = self.alerts_config.order_p95_threshold if "order" in metric_name.lower() else self.alerts_config.market_p95_threshold
-                    if p95_value > threshold:
+                    if p95_value > threshold and self._is_trading_time():
                         self._trigger_alert(
                             f"latency_{metric_name}",
                             f"⚠️ 延迟告警: {metric_name} P95 延迟 ({p95_value:.2f} ms) "
@@ -433,6 +444,16 @@ class MetricsCollector:
         # 记录告警时间并输出
         self._last_alert_time[alert_type] = current_time
         logger.warning(message, tag="metrics_alert")
+    
+    def _is_trading_time(self) -> bool:
+        """判断当前是否在交易时段内"""
+        if self._trading_hours is None:
+            return True  # 未配置交易时间则默认为交易时段
+        
+        return DateTimeHelper.is_trading_time(
+            day_sessions=self._trading_hours.day_sessions,
+            night_sessions=self._trading_hours.night_sessions
+        )
     
     def _collect_system_metrics(self) -> Dict[str, float]:
         """
