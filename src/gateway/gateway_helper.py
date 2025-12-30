@@ -191,7 +191,26 @@ def extract_login_response_fields(rsp_user_login_field) -> dict:
 
 
 class ReconnectionController(object):
-    """CTP 客户端重连控制器"""
+    """
+    CTP 客户端重连控制器
+
+    逻辑说明：
+    当CTP连接断开时，系统会跟踪重连次数
+    如果两次断开的时间间隔小于reconnect_interval（默认可能是60秒），重连计数器+1
+    如果时间间隔大于reconnect_interval，说明之前的连接已经稳定运行了很长时间，计数器重置为1
+
+    举例：
+    time gap: 2262.3s = 约37分钟
+    说明上次连接成功后稳定运行了37分钟才断开
+    这是正常的断开（比如收盘后CTP服务器主动断开），不是频繁重连
+    计数器重置为1，表示这是一次"新的"断开，不计入连续重连失败
+
+    为什么这样设计：
+    防止频繁重连时无限重试（比如网络故障导致连上就断）
+    当连续快速断开达到最大次数（如5次）时，会触发错误回调
+    但如果连接稳定运行了一段时间后断开，说明不是配置问题，重置计数器允许重新尝试
+    error_code=4097通常表示CTP服务器主动断开连接（如收盘）。
+    """
 
     def __init__(self, max_attempts: int = 5, interval: float = 10.0, client_type: str = "CTP"):
         """
@@ -207,6 +226,7 @@ class ReconnectionController(object):
         self.last_connect_time: float = 0.0
         self.reconnect_interval: float = interval
         self.client_type: str = client_type
+
     def check_on_connected(self, callback, message_type: str, logger, current_time: float) -> bool:
         """检查重连状态并处理重连逻辑。
 

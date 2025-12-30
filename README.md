@@ -67,6 +67,18 @@ python scripts/update_instruments.py
 python scripts/store_market_data.py
 ```
 
+或者
+
+```bash
+# 启动交易服务后启动更新合约信息
+start_update_instruments.bat
+
+# 启动行情服务后启动存储行情数据
+start_store_market_data.bat
+```
+
+
+
 ## 数据存储格式
 
 ### Tick数据
