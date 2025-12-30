@@ -33,3 +33,10 @@
 ### Removed
 - 移除QuestDB和InfluxDB相关代码，只保留CSV存储
 - 移除 `config/config_csv.yaml`，统一使用 `config/config_md.yaml`
+- 清理docs目录中过时的文档（共删除22个文件）：
+  - 删除InfluxDB相关文档：`data_storage_design.md`, `storage_implementation_plan.md`, `storage_structure.md`, `implementation_progress.md`
+  - 删除Redis相关文档：`redis_setup_CN.md`, `monitoring_guide_CN.md`, `migration_guide_CN.md`, `performance_tuning_guide_CN.md`, `performance_report_CN.md`, `performance_baseline_report.md`
+  - 删除旧版本修复文档：`FIX_SUMMARY.md`, `FIX_SUMMARY_V2.md`, `DEBUG_GUIDE.md`, `HEARTBEAT_FIX.md`, `CTP_CONNECTION_ISSUE_RESOLVED.md`
+  - 删除过时的存储文档：`CSV_STORAGE_IMPLEMENTATION.md`, `CSV_STORAGE_READY.md`, `TEST_STORAGE_CLIENT_GUIDE.md`
+  - 删除过时的合约文档：`SIMNOW_SETUP_COMPLETE.md`, `FETCH_INSTRUMENTS_UPDATE.md`, `INSTRUMENTS_SIMPLIFICATION.md`
+  - 删除其他过时文档：`现在请这样做.md`
