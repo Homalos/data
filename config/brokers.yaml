@@ -1,5 +1,5 @@
 # 多环境配置，此配置暂时没有启用
-# SimNow 7x24环境（推荐，16:00到第二天08:59可用）
+# SimNow 7x24环境（16:00到第二天08:59可用）
 SimNow_7x24:
   BrokerID: "9999"
   TdFrontAddress: "tcp://182.254.243.31:40001"  # 交易前置
@@ -7,8 +7,6 @@ SimNow_7x24:
   AppID: "simnow_client_test"
   AuthCode: "0000000000000000"
   ProductInfo: ""
-  UserID: "123456"        # 替换为你的SimNow账号
-  Password: "Aa123456"    # 替换为你的SimNow密码
 
 # SimNow电信环境
 SimNow:
@@ -18,8 +16,6 @@ SimNow:
   AppID: "simnow_client_test"
   AuthCode: "0000000000000000"
   ProductInfo: ""
-  UserID: "123456"
-  Password: "Aa123456"
 
 HuaAn:
   BrokerID: "9999"
@@ -28,8 +24,6 @@ HuaAn:
   AppID: "simnow_client_test"
   AuthCode: "0000000000000000"
   ProductInfo: ""
-  UserID: "123456"
-  Password: "Aa123456"
 
 # 当前使用的环境
 Enable_MD: SimNow_7x24

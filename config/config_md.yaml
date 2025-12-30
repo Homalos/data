@@ -1,8 +1,7 @@
-# CTP前置地址
-# TdFrontAddress: tcp://182.254.243.31:40001 # 7x24交易前置地址
-# MdFrontAddress: tcp://182.254.243.31:40011 # 7x24行情前置地址
-TdFrontAddress: tcp://182.254.243.31:30001 # 交易前置地址
+# 行情前置地址
+#MdFrontAddress: tcp://182.254.243.31:40011 # 7x24行情前置地址
 MdFrontAddress: tcp://182.254.243.31:30012 # 行情前置地址
+#MdFrontAddress: "tcp://180.166.37.178:41215" # 华安期货
 BrokerID: "9999"
 AuthCode: "0000000000000000"
 AppID: simnow_client_test
@@ -23,7 +22,7 @@ Storage:
   # CSV配置
   CSV:
     BasePath: ./data/ticks  # 基础存储路径
-    FlushInterval: 1.0      # 刷新间隔（秒）
+    FlushInterval: 0.5      # 刷新间隔（秒）
     BatchSize: 100          # 批量写入大小
   
   # 合约管理配置
@@ -36,6 +35,13 @@ Storage:
   KLine:
     Enabled: true
     Periods: ["1m", "3m", "5m", "10m", "15m", "30m", "60m", "1d"]
+
+  # 特殊合约配置
+  Special:
+    instruments: ['TF', 'IF', 'T', 'TS', 'IC', 'IH']
+    IsSaveTick: true
+    IsSaveKLine: true
+
 
 # Redis缓存配置
 Cache:
@@ -52,7 +58,7 @@ Metrics:
   CpuWarningThreshold: 80.0
   MemoryWarningThreshold: 80.0
 
-# 测试配置
+# 测试时配置
 Test:
   SubscribeLimit: 50  # 订阅合约数量，0表示订阅所有
   ListenDuration: 0   # 监听时长（秒），0表示持续监听直到Ctrl+C
