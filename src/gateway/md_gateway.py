@@ -48,7 +48,7 @@ class MdGateway(mdapi.CThostFtdcMdSpi):
         return self._rsp_callback
 
     @rsp_callback.setter
-    def rsp_callback(self, callback: Callable[[dict[str, Any]], None]):
+    def rsp_callback(self, callback: Callable[[dict[str, Any]], None]) -> None:
         """
         设置响应回调函数
 
@@ -285,31 +285,79 @@ class MdGateway(mdapi.CThostFtdcMdSpi):
             None: 无直接返回值，通过self.rsp_callback回调函数返回处理后的数据
         """
         logger.debug(f"Receive depth market data: {depth_marketdata.InstrumentID}")
+
+        # logger.debug("TradingDay", depth_marketdata.TradingDay, type(depth_marketdata.TradingDay))
+        # logger.debug("InstrumentID", depth_marketdata.InstrumentID, type(depth_marketdata.InstrumentID))
+        # logger.debug("ExchangeID", depth_marketdata.ExchangeID, type(depth_marketdata.ExchangeID))
+        # logger.debug("ExchangeInstID", depth_marketdata.ExchangeInstID, type(depth_marketdata.ExchangeInstID))
+        # logger.debug("LastPrice", MathHelper.adjust_price(depth_marketdata.LastPrice), type(depth_marketdata.LastPrice))
+        # logger.debug("PreSettlementPrice", MathHelper.adjust_price(depth_marketdata.PreSettlementPrice), type(depth_marketdata.PreSettlementPrice))
+        # logger.debug("PreClosePrice", MathHelper.adjust_price(depth_marketdata.PreClosePrice), type(depth_marketdata.PreClosePrice))
+        # logger.debug("PreOpenInterest", MathHelper.adjust_price(depth_marketdata.PreOpenInterest), type(depth_marketdata.PreOpenInterest))
+        # logger.debug("OpenPrice", MathHelper.adjust_price(depth_marketdata.OpenPrice), type(depth_marketdata.OpenPrice))
+        # logger.debug("HighestPrice", MathHelper.adjust_price(depth_marketdata.HighestPrice), type(depth_marketdata.HighestPrice))
+        # logger.debug("LowestPrice", MathHelper.adjust_price(depth_marketdata.LowestPrice), type(depth_marketdata.LowestPrice))
+        # logger.debug("Volume", depth_marketdata.Volume, type(depth_marketdata.Volume))
+        # logger.debug("Turnover", MathHelper.adjust_price(depth_marketdata.Turnover), type(depth_marketdata.Turnover))
+        # logger.debug("OpenInterest", MathHelper.adjust_price(depth_marketdata.OpenInterest), type(depth_marketdata.OpenInterest))
+        # logger.debug("ClosePrice", MathHelper.adjust_price(depth_marketdata.ClosePrice), type(depth_marketdata.ClosePrice))
+        # logger.debug("SettlementPrice", MathHelper.adjust_price(depth_marketdata.SettlementPrice), type(depth_marketdata.SettlementPrice))
+        # logger.debug("UpperLimitPrice", MathHelper.adjust_price(depth_marketdata.UpperLimitPrice), type(depth_marketdata.UpperLimitPrice))
+        # logger.debug("LowerLimitPrice", MathHelper.adjust_price(depth_marketdata.LowerLimitPrice), type(depth_marketdata.LowerLimitPrice))
+        # logger.debug("PreDelta", depth_marketdata.PreDelta, type(depth_marketdata.PreDelta))
+        # logger.debug("CurrDelta", depth_marketdata.CurrDelta, type(depth_marketdata.PreDelta))
+        # logger.debug("UpdateTime", depth_marketdata.UpdateTime, type(depth_marketdata.UpdateTime))
+        # logger.debug("UpdateMillisec", depth_marketdata.UpdateMillisec, type(depth_marketdata.UpdateMillisec))
+        # logger.debug("BidPrice1", MathHelper.adjust_price(depth_marketdata.BidPrice1), type(depth_marketdata.BidPrice1))
+        # logger.debug("BidVolume1", depth_marketdata.BidVolume1, type(depth_marketdata.BidVolume1))
+        # logger.debug("AskPrice1", MathHelper.adjust_price(depth_marketdata.AskPrice1))
+        # logger.debug("AskVolume1", depth_marketdata.AskVolume1)
+        # logger.debug("BidPrice2", MathHelper.adjust_price(depth_marketdata.BidPrice2))
+        # logger.debug("BidVolume2", depth_marketdata.BidVolume2)
+        # logger.debug("AskPrice2", MathHelper.adjust_price(depth_marketdata.AskPrice2))
+        # logger.debug("AskVolume2", depth_marketdata.AskVolume2)
+        # logger.debug("BidPrice3", MathHelper.adjust_price(depth_marketdata.BidPrice3))
+        # logger.debug("BidVolume3", depth_marketdata.BidVolume3)
+        # logger.debug("AskPrice3", MathHelper.adjust_price(depth_marketdata.AskPrice3))
+        # logger.debug("AskVolume3", depth_marketdata.AskVolume3)
+        # logger.debug("BidPrice4", MathHelper.adjust_price(depth_marketdata.BidPrice4))
+        # logger.debug("BidVolume4", depth_marketdata.BidVolume4)
+        # logger.debug("AskPrice4", MathHelper.adjust_price(depth_marketdata.AskPrice4))
+        # logger.debug("AskVolume4", depth_marketdata.AskVolume4)
+        # logger.debug("BidPrice5", MathHelper.adjust_price(depth_marketdata.BidPrice5))
+        # logger.debug("BidVolume5", depth_marketdata.BidVolume5)
+        # logger.debug("AskPrice5", MathHelper.adjust_price(depth_marketdata.AskPrice5))
+        # logger.debug("AskVolume5", depth_marketdata.AskVolume5)
+        # logger.debug("AveragePrice", MathHelper.adjust_price(depth_marketdata.AveragePrice), type(depth_marketdata.AveragePrice))
+        # logger.debug("ActionDay", depth_marketdata.ActionDay, type(depth_marketdata.ActionDay))
+        # logger.debug("BandingLowerPrice", MathHelper.adjust_price(depth_marketdata.BandingLowerPrice), type(depth_marketdata.BandingLowerPrice))
+        # logger.debug("BandingUpperPrice", MathHelper.adjust_price(depth_marketdata.BandingUpperPrice), type(depth_marketdata.BandingUpperPrice))
+
         depth_data = {
-            "TradingDay": depth_marketdata.TradingDay,
-            "InstrumentID": depth_marketdata.InstrumentID,
-            "ExchangeID": depth_marketdata.ExchangeID,
-            "ExchangeInstID": depth_marketdata.ExchangeInstID,
-            "LastPrice": MathHelper.adjust_price(depth_marketdata.LastPrice),
-            "PreSettlementPrice": MathHelper.adjust_price(depth_marketdata.PreSettlementPrice),
-            "PreClosePrice": MathHelper.adjust_price(depth_marketdata.PreClosePrice),
-            "PreOpenInterest": depth_marketdata.PreOpenInterest,
-            "OpenPrice": MathHelper.adjust_price(depth_marketdata.OpenPrice),
-            "HighestPrice": MathHelper.adjust_price(depth_marketdata.HighestPrice),
-            "LowestPrice": MathHelper.adjust_price(depth_marketdata.LowestPrice),
-            "Volume": depth_marketdata.Volume,
-            "Turnover": depth_marketdata.Turnover,
-            "OpenInterest": depth_marketdata.OpenInterest,
-            "ClosePrice": MathHelper.adjust_price(depth_marketdata.ClosePrice),
-            "SettlementPrice": MathHelper.adjust_price(depth_marketdata.SettlementPrice),
-            "UpperLimitPrice": MathHelper.adjust_price(depth_marketdata.UpperLimitPrice),
-            "LowerLimitPrice": MathHelper.adjust_price(depth_marketdata.LowerLimitPrice),
-            "PreDelta": depth_marketdata.PreDelta,
-            "CurrDelta": depth_marketdata.CurrDelta,
-            "UpdateTime": depth_marketdata.UpdateTime,
-            "UpdateMillisec": depth_marketdata.UpdateMillisec,
-            "BidPrice1": MathHelper.adjust_price(depth_marketdata.BidPrice1),
-            "BidVolume1": depth_marketdata.BidVolume1,
+            "TradingDay": depth_marketdata.TradingDay,  # str
+            "InstrumentID": depth_marketdata.InstrumentID,  # str
+            "ExchangeID": depth_marketdata.ExchangeID,  # str
+            "ExchangeInstID": depth_marketdata.ExchangeInstID,  # str
+            "LastPrice": MathHelper.adjust_price(depth_marketdata.LastPrice),   # float
+            "PreSettlementPrice": MathHelper.adjust_price(depth_marketdata.PreSettlementPrice), # float
+            "PreClosePrice": MathHelper.adjust_price(depth_marketdata.PreClosePrice), # float
+            "PreOpenInterest": MathHelper.adjust_price(depth_marketdata.PreOpenInterest), # float
+            "OpenPrice": MathHelper.adjust_price(depth_marketdata.OpenPrice), # float
+            "HighestPrice": MathHelper.adjust_price(depth_marketdata.HighestPrice), # float
+            "LowestPrice": MathHelper.adjust_price(depth_marketdata.LowestPrice), # float
+            "Volume": depth_marketdata.Volume,  # int
+            "Turnover": MathHelper.adjust_price(depth_marketdata.Turnover), # float
+            "OpenInterest": MathHelper.adjust_price(depth_marketdata.OpenInterest), # float
+            "ClosePrice": MathHelper.adjust_price(depth_marketdata.ClosePrice),  # float
+            "SettlementPrice": MathHelper.adjust_price(depth_marketdata.SettlementPrice),  # float
+            "UpperLimitPrice": MathHelper.adjust_price(depth_marketdata.UpperLimitPrice),  # float
+            "LowerLimitPrice": MathHelper.adjust_price(depth_marketdata.LowerLimitPrice),  # float
+            "PreDelta": depth_marketdata.PreDelta,  # float
+            "CurrDelta": depth_marketdata.CurrDelta,  # float
+            "UpdateTime": depth_marketdata.UpdateTime,  # str
+            "UpdateMillisec": depth_marketdata.UpdateMillisec,  # int
+            "BidPrice1": MathHelper.adjust_price(depth_marketdata.BidPrice1),  # float
+            "BidVolume1": depth_marketdata.BidVolume1,  # int
             "AskPrice1": MathHelper.adjust_price(depth_marketdata.AskPrice1),
             "AskVolume1": depth_marketdata.AskVolume1,
             "BidPrice2": MathHelper.adjust_price(depth_marketdata.BidPrice2),
@@ -328,10 +376,10 @@ class MdGateway(mdapi.CThostFtdcMdSpi):
             "BidVolume5": depth_marketdata.BidVolume5,
             "AskPrice5": MathHelper.adjust_price(depth_marketdata.AskPrice5),
             "AskVolume5": depth_marketdata.AskVolume5,
-            "AveragePrice": MathHelper.adjust_price(depth_marketdata.AveragePrice),
-            "ActionDay": depth_marketdata.ActionDay,
-            "BandingLowerPrice": MathHelper.adjust_price(depth_marketdata.BandingLowerPrice),
-            "BandingUpperPrice": MathHelper.adjust_price(depth_marketdata.BandingUpperPrice)
+            "AveragePrice": MathHelper.adjust_price(depth_marketdata.AveragePrice),  # float
+            "ActionDay": depth_marketdata.ActionDay,  # str
+            "BandingLowerPrice": MathHelper.adjust_price(depth_marketdata.BandingLowerPrice),  # float
+            "BandingUpperPrice": MathHelper.adjust_price(depth_marketdata.BandingUpperPrice)  # float
         }
 
         # 构建响应并回调
