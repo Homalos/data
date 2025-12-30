@@ -1,15 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-@ProjectName: homalos-data
-@FileName   : datetime_helper.py
-@Date       : 2025/12/27 22:29
-@Author     : Lumosylva
-@Email      : donnymoving@gmail.com
-@Software   : PyCharm
-@Description: 日期时间工具
+日期时间工具
 """
-from datetime import datetime
+import zoneinfo
+from datetime import datetime, time
+from typing import List, Tuple
 
 
 class DateTimeHelper(object):
@@ -35,18 +31,89 @@ class DateTimeHelper(object):
         Returns:
             剩余天数（如果未来日期在今天之前则返回负数）
         """
-        # 1. 获取当前日期（不含时间部分）
         today = datetime.now().date()
-
-        # 2. 将字符串转换为日期对象
-        # 注意：字符串格式必须与指定的格式完全匹配
         future_date = datetime.strptime(date_str, "%Y%m%d").date()
-
-        # 3. 计算天数差
         delta = future_date - today
-        days_diff = delta.days
+        return delta.days
 
-        return days_diff
+    @staticmethod
+    def is_trading_time(
+        day_sessions: List[List[str]] = None,
+        night_sessions: List[List[str]] = None
+    ) -> bool:
+        """
+        判断当前时间是否在交易时段内
+        
+        Args:
+            day_sessions: 日盘交易时段列表，如 [["09:00:00", "10:15:00"], ["10:30:00", "11:30:00"]]
+            night_sessions: 夜盘交易时段列表，如 [["21:00:00", "23:00:00"], ["23:00:00", "02:30:00"]]
+        
+        Returns:
+            bool: 是否在交易时段内
+        """
+        if day_sessions is None:
+            day_sessions = [["09:00:00", "10:15:00"], ["10:30:00", "11:30:00"], ["13:30:00", "15:00:00"]]
+        if night_sessions is None:
+            night_sessions = [["21:00:00", "23:00:00"], ["23:00:00", "02:30:00"]]
+        
+        now = datetime.now()
+        current_time = now.time()
+        weekday = now.weekday()  # 0=周一, 6=周日
+        
+        # 周六周日不交易（但周五夜盘可能跨到周六凌晨）
+        if weekday == 6:  # 周日
+            return False
+        if weekday == 5:  # 周六，只有凌晨时段可能有（周五夜盘延续）
+            # 检查是否在夜盘跨日时段（00:00-02:30）
+            for session in night_sessions:
+                start_str, end_str = session
+                end_time = DateTimeHelper._parse_time(end_str)
+                # 只检查跨日的夜盘（结束时间小于开始时间）
+                if DateTimeHelper._parse_time(start_str) > end_time:
+                    if current_time <= end_time:
+                        return True
+            return False
+        
+        # 检查日盘时段（周一到周五）
+        for session in day_sessions:
+            start_str, end_str = session
+            start_time = DateTimeHelper._parse_time(start_str)
+            end_time = DateTimeHelper._parse_time(end_str)
+            if start_time <= current_time <= end_time:
+                return True
+        
+        # 检查夜盘时段（周一到周五晚上，以及周二到周六凌晨）
+        for session in night_sessions:
+            start_str, end_str = session
+            start_time = DateTimeHelper._parse_time(start_str)
+            end_time = DateTimeHelper._parse_time(end_str)
+            
+            if start_time > end_time:
+                # 跨日时段，如 21:00 - 02:30
+                if current_time >= start_time or current_time <= end_time:
+                    # 周五晚上21:00后或周六凌晨02:30前
+                    if weekday == 4 and current_time >= start_time:  # 周五晚上
+                        return True
+                    if weekday < 5 and current_time >= start_time:  # 周一到周四晚上
+                        return True
+                    if weekday > 0 and current_time <= end_time:  # 周二到周六凌晨
+                        return True
+            else:
+                # 不跨日时段
+                if start_time <= current_time <= end_time:
+                    if weekday < 5:  # 周一到周五
+                        return True
+        
+        return False
+
+    @staticmethod
+    def _parse_time(time_str: str) -> time:
+        """解析时间字符串为time对象，支持HH:MM和HH:MM:SS格式"""
+        parts = time_str.split(":")
+        hour = int(parts[0])
+        minute = int(parts[1])
+        second = int(parts[2]) if len(parts) > 2 else 0
+        return time(hour, minute, second)
 
 
 if __name__ == '__main__':
