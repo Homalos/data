@@ -53,6 +53,8 @@ CTP_PASSWORD=你的密码
 
 ### 3. 运行
 
+#### 直接运行
+
 ```bash
 # 启动交易服务
 python main.py --config=./config/config_td.yaml --app_type=td
@@ -77,7 +79,14 @@ start_update_instruments.bat
 start_store_market_data.bat
 ```
 
+#### 定时运行
 
+```bash
+# 任务调度器按 config/scheduler.yaml 中的定时任务调度配置执行
+start_scheduler.bat
+```
+
+![scheduler_config](assets/scheduler_config.jpg)
 
 ## 数据存储格式
 

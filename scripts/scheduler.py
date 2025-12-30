@@ -20,6 +20,60 @@ from loguru import logger
 PROJECT_ROOT = Path(__file__).parent.parent
 
 
+def cron_to_chinese(cron_expr: str) -> str:
+    """
+    将cron表达式转换为易读的中文描述
+    
+    Args:
+        cron_expr: cron表达式，格式：分 时 日 月 周
+        
+    Returns:
+        中文描述字符串
+    """
+    parts = cron_expr.split()
+    if len(parts) != 5:
+        return cron_expr
+    
+    minute, hour, day, month, weekday = parts
+    
+    # 解析周几
+    weekday_map = {
+        '0': '周日', '1': '周一', '2': '周二', '3': '周三',
+        '4': '周四', '5': '周五', '6': '周六', '7': '周日',
+        'sun': '周日', 'mon': '周一', 'tue': '周二', 'wed': '周三',
+        'thu': '周四', 'fri': '周五', 'sat': '周六'
+    }
+    
+    result_parts = []
+    
+    # 解析周
+    if weekday == '*':
+        result_parts.append("每天")
+    elif '-' in weekday:
+        start, end = weekday.split('-')
+        start_cn = weekday_map.get(start.lower(), start)
+        end_cn = weekday_map.get(end.lower(), end)
+        result_parts.append(f"{start_cn}至{end_cn}")
+    elif ',' in weekday:
+        days = [weekday_map.get(d.lower(), d) for d in weekday.split(',')]
+        result_parts.append('、'.join(days))
+    else:
+        result_parts.append(weekday_map.get(weekday.lower(), f"周{weekday}"))
+    
+    # 解析时间
+    if minute == '*' and hour == '*':
+        result_parts.append("每分钟")
+    elif minute.startswith('*/'):
+        interval = minute[2:]
+        result_parts.append(f"每{interval}分钟")
+    elif hour == '*':
+        result_parts.append(f"每小时的第{minute}分")
+    else:
+        result_parts.append(f"{hour.zfill(2)}:{minute.zfill(2)}")
+    
+    return ' '.join(result_parts)
+
+
 def run_command(command: str, name: str = "task"):
     """
     执行命令
@@ -205,7 +259,7 @@ def setup_scheduler(config: dict) -> BackgroundScheduler:
                         name=name
                     )
             
-            logger.info(f"已添加任务: [{name}] cron={cron_expr}")
+            logger.info(f"已添加任务: [{name}] {cron_to_chinese(cron_expr)} (cron={cron_expr})")
             
         except Exception as e:
             logger.error(f"添加任务 [{name}] 失败: {e}")
@@ -250,7 +304,9 @@ def main():
         logger.info("\n已配置的任务:")
         for task in config.get("tasks", []):
             status = "启用" if task.get("enabled", True) else "禁用"
-            logger.info(f"  - {task.get('name')}: {task.get('cron')} [{status}]")
+            cron_expr = task.get('cron', '')
+            cron_desc = cron_to_chinese(cron_expr) if cron_expr else "未配置"
+            logger.info(f"  - {task.get('name')}: {cron_desc} (cron={cron_expr}) [{status}]")
         return
     
     # 立即执行指定任务
