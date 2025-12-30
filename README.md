@@ -13,7 +13,7 @@
 
 ## 项目结构
 
-```
+```reStructuredText
 homalos-data/
 ├── config/                 # 配置文件
 │   ├── config_md.yaml      # 行情服务配置
@@ -55,7 +55,7 @@ CTP_PASSWORD=你的密码
 
 #### 直接运行
 
-```bash
+```python
 # 启动交易服务
 python main.py --config=./config/config_td.yaml --app_type=td
 
