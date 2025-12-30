@@ -30,16 +30,16 @@ tasks:
     cron: "30 8 * * 1-5"  # 周一到周五 08:30
     enabled: true
 
-  # 更新合约信息（每天早上08:00）
+  # 更新合约信息
   - name: "更新合约信息"
     type: command
     command: "python scripts/update_instruments.py"
-    cron: "31 8 * * 1-5"  # 周一到周五 08:00
-    enabled: false
+    cron: "31 8 * * 1-5"  # 周一到周五 08:31
+    enabled: true
 
   # 订阅并存储行情数据
   - name: "订阅存储行情"
     type: command
     command: "python scripts/store_market_data.py"
-    cron: "35 8 * * 1-5"  # 周一到周五 08:35（服务启动后5分钟）
-    enabled: false
+    cron: "35 8 * * 1-5"  # 周一到周五 08:35
+    enabled: true
