@@ -82,7 +82,7 @@ start_store_market_data.bat
 #### 定时运行
 
 ```bash
-# 任务调度器按 config/scheduler.yaml 中的定时任务调度配置执行
+# 使用任务调度器按 config/scheduler.yaml 中的配置执行
 start_scheduler.bat
 ```
 
@@ -135,7 +135,7 @@ YYYY-MM-DDTHH:mm:ss.sss+08:00
 - Tick时间: `2025-12-30T09:30:15.500+08:00`
 - K线时间: `2025-12-30T09:30:00.000+08:00`
 
-## 脚本说明
+## 核心脚本说明
 
 ### store_market_data.py
 
@@ -215,11 +215,12 @@ tasks:
     cron: "30 8 * * 1-5"  # 周一到周五 08:30
     enabled: true
 
-  - name: "更新合约信息"
-    type: command
-    command: "python scripts/update_instruments.py"
-    cron: "0 8 * * 1-5"
-    enabled: false
+  - name: "启动行情服务"
+    type: service
+    config_file: "./config/config_md.yaml"
+    app_type: md
+    cron: "30 8 * * 1-5"  # 周一到周五 08:30
+    enabled: true
 ```
 
 cron 表达式格式：`分 时 日 月 周`
@@ -230,16 +231,6 @@ cron 表达式格式：`分 时 日 月 周`
 
 ```bash
 python scripts/update_instruments.py
-```
-
-## 批处理脚本
-
-```bash
-start_md_server.bat          # 启动行情服务
-start_td_server.bat          # 启动交易服务
-start_store_market_data.bat  # 启动行情存储
-start_scheduler.bat          # 启动定时调度器
-start_update_instruments.bat # 更新合约信息
 ```
 
 ## License

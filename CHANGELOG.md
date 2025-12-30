@@ -30,6 +30,13 @@
 - 修复调度器在Windows下Ctrl+C无法退出的问题（改用BackgroundScheduler）
 - 修复调度器启动服务时无法看到终端输出的问题（使用新CMD窗口启动）
 
+### Changed (Documentation)
+- 更新 `docs/QUICK_START.md` - 简化快速开始指南，移除过时的自动登录流程描述
+- 更新 `docs/troubleshooting_CN.md` - 移除Redis相关故障排查内容，精简文档结构
+- 更新 `docs/development_CN.md` - 更新架构描述，添加CSV存储层说明
+- 更新 `docs/TROUBLESHOOTING.md` - 精简英文版故障排查指南
+- 更新 `docs/HOW_TO_USE_AUTO_LOGIN.md` - 简化自动登录使用指南
+
 ### Removed
 - 移除QuestDB和InfluxDB相关代码，只保留CSV存储
 - 移除 `config/config_csv.yaml`，统一使用 `config/config_md.yaml`
