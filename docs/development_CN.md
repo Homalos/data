@@ -20,8 +20,17 @@ homalos-webctp 是一个基于 FastAPI 和 WebSocket 的 CTP 接口服务，将�
 - **FastAPI**: Web 框架
 - **WebSocket**: 实时通信协议
 - **anyio**: 异步 I/O 库
-- **ctp api**: CTP Python 绑定
+- **openctp-ctp**: CTP Python 绑定
 - **PyYAML**: 配置文件解析
+- **CSV**: 数据存储格式
+
+### 主要功能
+
+- 行情服务（端口 8080）
+- 交易服务（端口 8081）
+- Tick 数据存储（CSV 格式）
+- K线数据生成和存储
+- 合约信息管理
 
 ## 架构设计
 
@@ -53,8 +62,29 @@ homalos-webctp 是一个基于 FastAPI 和 WebSocket 的 CTP 接口服务，将�
 └──────┬──────────────────────┘
        │
 ┌──────▼──────────────────────┐
+│   Storage Layer             │
+│  (storage/csv_*.py)         │
+│  - CSV Tick 存储             │
+│  - CSV K线 存储              │
+│  - 合约信息管理              │
+└──────┬──────────────────────┘
+       │
+┌──────▼──────────────────────┐
 │   CTP API (openctp-ctp)     │
 └─────────────────────────────┘
+```
+
+### 数据存储架构
+
+```
+data/
+├── ticks/                    # Tick 数据目录
+│   └── {YYYYMMDD}/          # 按日期分目录
+│       └── {instrument}.csv  # 按合约分文件
+├── klines/                   # K线数据目录
+│   └── {period}/            # 按周期分目录
+│       └── {instrument}.csv  # 按合约分文件
+└── instruments.json          # 合约信息缓存
 ```
 
 ### 核心设计模式
@@ -122,31 +152,55 @@ pip install -e .
 复制示例配置并修改：
 
 ```bash
-cp config.sample.yaml config_md.yaml
-cp config.sample.yaml config_td.yaml
+cp config/config.sample.yaml config/config_md.yaml
+cp config/config.sample.yaml config/config_td.yaml
 ```
 
 编辑配置文件，填入正确的信息：
 
 ```yaml
-TdFrontAddress: tcp://182.254.243.31:40001
+# config/config_md.yaml
 MdFrontAddress: tcp://182.254.243.31:40011
 BrokerID: "9999"
 AuthCode: "0000000000000000"
 AppID: simnow_client_test
 Port: 8080
-Host: 0.0.0.0
+Host: 127.0.0.1
 LogLevel: INFO
+
+# 存储配置
+Storage:
+  Enabled: true
+  Type: csv
+  CSV:
+    BasePath: ./data/ticks
+    FlushInterval: 0.5
+    BatchSize: 100
 ```
 
-### 4. 启动服务
+### 4. 环境变量
+
+创建 `.env` 文件：
+
+```bash
+cp .env.example .env
+```
+
+填入账号信息：
+
+```bash
+CTP_USER_ID=你的账号
+CTP_PASSWORD=你的密码
+```
+
+### 5. 启动服务
 
 ```bash
 # 行情服务
-python main.py --config=config_md.yaml --app_type=md
+python main.py --config=./config/config_md.yaml --app_type=md
 
 # 交易服务
-python main.py --config=config_td.yaml --app_type=td
+python main.py --config=./config/config_td.yaml --app_type=td
 ```
 
 ## 代码结构
@@ -154,52 +208,78 @@ python main.py --config=config_td.yaml --app_type=td
 ### 目录说明
 
 ```
-webctp/
-├── apps/                   # 应用入口
-│   ├── __init__.py
-│   ├── md_app.py          # 行情服务 FastAPI 应用
-│   └── td_app.py          # 交易服务 FastAPI 应用
+homalos-webctp/
+├── src/
+│   ├── apps/                   # 应用入口
+│   │   ├── __init__.py
+│   │   ├── md_app.py          # 行情服务 FastAPI 应用
+│   │   └── td_app.py          # 交易服务 FastAPI 应用
+│   │
+│   ├── clients/                # CTP 客户端封装
+│   │   ├── __init__.py
+│   │   ├── md_client.py       # 行情客户端 (继承 CThostFtdcMdSpi)
+│   │   └── td_client.py       # 交易客户端 (继承 CThostFtdcTraderSpi)
+│   │
+│   ├── services/               # 服务层
+│   │   ├── __init__.py
+│   │   ├── base_client.py     # 客户端基类 (抽象类)
+│   │   ├── md_client.py       # 行情服务 (继承 BaseClient)
+│   │   ├── td_client.py       # 交易服务 (继承 BaseClient)
+│   │   └── connection.py      # WebSocket 连接管理
+│   │
+│   ├── storage/                # 存储层
+│   │   ├── __init__.py
+│   │   ├── csv_tick_storage.py    # CSV Tick 存储
+│   │   ├── csv_kline_storage.py   # CSV K线 存储
+│   │   ├── kline_builder.py       # K线生成器
+│   │   ├── kline_period.py        # K线周期定义
+│   │   ├── instrument_manager.py  # 合约管理器
+│   │   └── storage_helper.py      # 存储辅助函数
+│   │
+│   ├── constants/              # 常量定义
+│   │   ├── __init__.py
+│   │   ├── call_errors.py     # 错误码定义
+│   │   └── constant.py        # 消息类型常量
+│   │
+│   ├── model/                  # 数据模型
+│   │   ├── __init__.py
+│   │   └── request.py         # 请求数据模型
+│   │
+│   └── utils/                  # 工具函数
+│       ├── __init__.py
+│       ├── config.py          # 配置管理
+│       ├── ctp_object_helper.py  # CTP 对象辅助函数
+│       └── math_helper.py     # 数学辅助函数
 │
-├── clients/                # CTP 客户端封装
-│   ├── __init__.py
-│   ├── md_client.py       # 行情客户端 (继承 CThostFtdcMdSpi)
-│   └── td_client.py       # 交易客户端 (继承 CThostFtdcTraderSpi)
+├── config/                     # 配置文件目录
+│   ├── config.sample.yaml     # 示例配置
+│   ├── config_md.yaml         # 行情服务配置
+│   └── config_td.yaml         # 交易服务配置
 │
-├── services/               # 服务层
-│   ├── __init__.py
-│   ├── base_client.py     # 客户端基类 (抽象类)
-│   ├── md_client.py       # 行情服务 (继承 BaseClient)
-│   ├── td_client.py       # 交易服务 (继承 BaseClient)
-│   └── connection.py      # WebSocket 连接管理
+├── data/                       # 数据目录
+│   ├── ticks/                 # Tick 数据
+│   ├── klines/                # K线数据
+│   └── instruments.json       # 合约信息
 │
-├── constants/              # 常量定义
-│   ├── __init__.py
-│   ├── call_errors.py     # 错误码定义
-│   └── constant.py        # 消息类型常量
+├── docs/                       # 文档
+│   ├── QUICK_START.md         # 快速开始
+│   ├── development_CN.md      # 开发文档 (本文件)
+│   └── troubleshooting_CN.md  # 故障排查
 │
-├── model/                  # 数据模型
-│   ├── __init__.py
-│   └── request.py         # 请求数据模型
+├── scripts/                    # 脚本
+│   ├── auto_login_td.py       # 自动登录脚本
+│   ├── query_tick_csv.py      # 查询 Tick 数据
+│   └── query_kline_csv.py     # 查询 K线 数据
 │
-├── utils/                  # 工具函数
-│   ├── __init__.py
-│   ├── config.py          # 配置管理
-│   ├── ctp_object_helper.py  # CTP 对象辅助函数
-│   └── math_helper.py     # 数学辅助函数
-│
-├── docs/                   # 文档
-│   ├── md_protocol.md     # 行情协议文档
-│   ├── td_protocol.md     # 交易协议文档
-│   └── development.md     # 开发文档 (本文件)
-│
-├── main.py                 # 主入口
-├── pyproject.toml          # 项目配置和依赖
-└── README.md               # 项目说明
+├── tests/                      # 测试
+├── main.py                     # 主入口
+├── pyproject.toml              # 项目配置和依赖
+└── README.md                   # 项目说明
 ```
 
 ### 关键文件说明
 
-#### `services/base_client.py`
+#### `src/services/base_client.py`
 
 抽象基类，提供：
 - 客户端生命周期管理 (start/stop/run)
@@ -207,7 +287,7 @@ webctp/
 - 异步/同步边界处理
 - 公共属性和方法
 
-#### `services/td_client.py` & `services/md_client.py`
+#### `src/services/td_client.py` & `src/services/md_client.py`
 
 具体的服务实现：
 - 继承 `BaseClient`
@@ -215,13 +295,27 @@ webctp/
 - 处理特定的业务逻辑
 - 请求验证和路由
 
-#### `clients/td_client.py` & `clients/md_client.py`
+#### `src/clients/td_client.py` & `src/clients/md_client.py`
 
 CTP API 封装：
 - 继承 CTP Spi 类
 - 实现回调方法
 - 封装 API 调用
 - 数据转换
+
+#### `src/storage/csv_tick_storage.py`
+
+CSV Tick 存储：
+- 按日期和合约分文件存储
+- 批量写入优化
+- 自动刷新机制
+
+#### `src/storage/kline_builder.py`
+
+K线生成器：
+- 从 Tick 数据生成 K线
+- 支持多周期（1m, 5m, 15m, 30m, 60m, 1d）
+- 实时更新
 
 ## 开发指南
 
@@ -267,7 +361,6 @@ def OnRspQryNewApi(self, pData, pRspInfo, nRequestID, bIsLast):
         response[Constant.NewApiData] = {
             "Field1": pData.Field1,
             "Field2": pData.Field2,
-            # ... 其他字段
         }
     self.rsp_callback(response)
 ```
@@ -279,10 +372,6 @@ def _init_call_map(self):
     # ... 其他映射
     self._call_map[Constant.ReqQryNewApi] = self._client.reqQryNewApi
 ```
-
-#### 4. 更新协议文档
-
-在 `docs/td_protocol.md` 中添加接口说明。
 
 ### 错误处理最佳实践
 
@@ -311,42 +400,52 @@ logging.error("错误信息")
 logging.exception("异常信息，包含堆栈")
 ```
 
-#### 3. 异常捕获
+### 数据存储
 
-```python
-try:
-    # 可能出错的代码
-    result = await some_operation()
-except SpecificException as e:
-    logging.exception(f"Operation failed: {e}")
-    # 处理异常
+#### CSV 存储格式
+
+**Tick 数据** (`data/ticks/{YYYYMMDD}/{instrument}.csv`):
+```csv
+datetime,last_price,volume,open_interest,bid_price1,ask_price1,bid_volume1,ask_volume1
+2025-12-30T09:00:00.500+08:00,4500.0,100,50000,4499.0,4501.0,10,15
 ```
 
-### 重连控制
+**K线数据** (`data/klines/{period}/{instrument}.csv`):
+```csv
+datetime,open,high,low,close,volume,open_interest
+2025-12-30T09:00:00+08:00,4500.0,4510.0,4495.0,4505.0,1000,50000
+```
 
-行情客户端实现了重连控制机制，防止配置错误导致的疯狂重连：
+#### 时间格式
+
+统一使用 ISO 8601 东八区格式：`YYYY-MM-DDTHH:mm:ss.sss+08:00`
+
+#### 浮点数精度
+
+使用 `repr()` 保持原始精度：
 
 ```python
-# 在 clients/md_client.py
-def OnFrontConnected(self):
-    current_time = time.time()
-    if current_time - self._last_connect_time < self._reconnect_interval:
-        self._reconnect_count += 1
-        if self._reconnect_count > self._max_reconnect_attempts:
-            logging.error("超过最大重连次数")
-            return
-    else:
-        self._reconnect_count = 0
-    
-    self._last_connect_time = current_time
-    self.login()
+# 正确
+price_str = repr(tick.last_price)  # "4500.5"
+
+# 错误（可能丢失精度）
+price_str = str(tick.last_price)   # "4500.5"
 ```
 
 ## 测试指南
 
 ### 单元测试
 
-(待补充)
+```bash
+# 运行所有测试
+pytest
+
+# 运行特定测试
+pytest tests/test_storage.py
+
+# 显示详细输出
+pytest -v
+```
 
 ### 集成测试
 
@@ -359,7 +458,7 @@ def OnFrontConnected(self):
 
 ### 测试工具
 
-- **Apifox**: API 测试工具
+- **pytest**: 单元测试框架
 - **wscat**: WebSocket 命令行工具
 - **浏览器开发者工具**: WebSocket 调试
 
@@ -420,3 +519,5 @@ A:
 ## 联系方式
 
 - 项目主页: https://github.com/Homalos/homalos-webctp
+- 邮箱: donnymoving@gmail.com
+- QQ群: 446042777
