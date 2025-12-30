@@ -1,0 +1,38 @@
+# 日志配置文件
+# Logger Configuration
+
+# 日志目录
+log_dir: logs
+
+# 控制台输出配置
+console:
+  enabled: true
+  level: DEBUG
+  colorize: true
+  # 格式模板变量: {time}, {level}, {name}, {function}, {line}, {message}
+  format: "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | <level>{message}</level>"
+
+# 主日志文件配置
+main_log:
+  enabled: true
+  filename: webctp.log
+  level: DEBUG
+  rotation: "500 MB"      # 单文件大小限制
+  retention: "7 days"     # 保留时间
+  compression: zip        # 压缩格式
+  format: "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} | {message}"
+
+# 错误日志文件配置
+error_log:
+  enabled: true
+  filename: webctp_error.log
+  level: ERROR
+  rotation: "500 MB"
+  retention: "30 days"
+  compression: zip
+  format: "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} | {message}"
+
+# 通用配置
+common:
+  backtrace: true         # 是否显示完整堆栈
+  diagnose: true          # 是否显示诊断信息

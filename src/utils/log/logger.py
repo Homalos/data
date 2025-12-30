@@ -14,8 +14,9 @@ import contextvars
 import sys
 import uuid
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
+import yaml
 from loguru import logger as _logger
 
 # 创建 trace_id 上下文变量，用于追踪请求
@@ -28,6 +29,89 @@ _default_tag_context: contextvars.ContextVar[Optional[str]] = contextvars.Contex
     'default_tag', default=None
 )
 
+# 默认配置
+DEFAULT_CONFIG = {
+    'log_dir': 'logs',
+    'console': {
+        'enabled': True,
+        'level': 'DEBUG',
+        'colorize': True,
+        'format': '<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | <level>{message}</level>'
+    },
+    'main_log': {
+        'enabled': True,
+        'filename': 'webctp.log',
+        'level': 'DEBUG',
+        'rotation': '500 MB',
+        'retention': '7 days',
+        'compression': 'zip',
+        'format': '{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} | {message}'
+    },
+    'error_log': {
+        'enabled': True,
+        'filename': 'webctp_error.log',
+        'level': 'ERROR',
+        'rotation': '500 MB',
+        'retention': '30 days',
+        'compression': 'zip',
+        'format': '{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} | {message}'
+    },
+    'common': {
+        'backtrace': True,
+        'diagnose': True
+    }
+}
+
+
+def _load_config() -> dict[str, Any]:
+    """
+    加载日志配置文件
+    
+    按以下顺序查找配置文件：
+    1. config/logger.yaml
+    2. 使用默认配置
+    
+    Returns:
+        配置字典
+    """
+    config_paths = [
+        Path('config/logger.yaml'),
+        Path(__file__).parent.parent.parent.parent / 'config' / 'logger.yaml',
+    ]
+    
+    for config_path in config_paths:
+        if config_path.exists():
+            try:
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = yaml.safe_load(f)
+                    if config:
+                        # 合并默认配置和文件配置
+                        return _merge_config(DEFAULT_CONFIG, config)
+            except Exception:
+                pass
+    
+    return DEFAULT_CONFIG
+
+
+def _merge_config(default: dict, override: dict) -> dict:
+    """
+    递归合并配置字典
+    
+    Args:
+        default: 默认配置
+        override: 覆盖配置
+        
+    Returns:
+        合并后的配置
+    """
+    result = default.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _merge_config(result[key], value)
+        else:
+            result[key] = value
+    return result
+
 
 class Logger:
     """
@@ -38,6 +122,7 @@ class Logger:
     - 支持 trace_id 追踪
     - 支持控制台和文件输出
     - 支持自定义日志格式
+    - 支持从 YAML 配置文件加载配置
     - 线程安全和异步安全
     
     使用示例：
@@ -50,14 +135,11 @@ class Logger:
         logger.set_trace_id("req-123456")
         logger.info("处理请求", tag="request")
         logger.clear_trace_id()
-        
-        # 上下文管理器
-        with logger.trace("req-789"):
-            logger.info("在 trace 上下文中", tag="service")
     """
     
     _instance = None
     _initialized = False
+    _config: dict[str, Any] = {}
     
     def __new__(cls):
         """单例模式"""
@@ -70,67 +152,67 @@ class Logger:
         if Logger._initialized:
             return
         
+        # 加载配置
+        Logger._config = _load_config()
+        
         # 移除默认的处理器
         _logger.remove()
         
-        # 添加控制台处理器
-        _logger.add(
-            sys.stdout,
-            format=self._get_console_format(),
-            level="DEBUG",
-            colorize=True,
-            backtrace=True,
-            diagnose=True,
-        )
+        # 获取通用配置
+        common = Logger._config.get('common', {})
+        backtrace = common.get('backtrace', True)
+        diagnose = common.get('diagnose', True)
         
-        # 添加文件处理器（日志文件）
-        log_dir = Path("logs")
+        # 添加控制台处理器
+        console_config = Logger._config.get('console', {})
+        if console_config.get('enabled', True):
+            _logger.add(
+                sys.stdout,
+                format=console_config.get('format', DEFAULT_CONFIG['console']['format']),
+                level=console_config.get('level', 'DEBUG'),
+                colorize=console_config.get('colorize', True),
+                backtrace=backtrace,
+                diagnose=diagnose,
+            )
+        
+        # 创建日志目录
+        log_dir = Path(Logger._config.get('log_dir', 'logs'))
         log_dir.mkdir(exist_ok=True)
         
-        _logger.add(
-            log_dir / "webctp.log",
-            format=self._get_file_format(),
-            level="DEBUG",
-            rotation="500 MB",
-            retention="7 days",
-            compression="zip",
-            backtrace=True,
-            diagnose=True,
-        )
+        # 添加主日志文件处理器
+        main_log_config = Logger._config.get('main_log', {})
+        if main_log_config.get('enabled', True):
+            _logger.add(
+                log_dir / main_log_config.get('filename', 'webctp.log'),
+                format=main_log_config.get('format', DEFAULT_CONFIG['main_log']['format']),
+                level=main_log_config.get('level', 'DEBUG'),
+                rotation=main_log_config.get('rotation', '500 MB'),
+                retention=main_log_config.get('retention', '7 days'),
+                compression=main_log_config.get('compression', 'zip'),
+                backtrace=backtrace,
+                diagnose=diagnose,
+            )
         
-        # 添加错误日志文件
-        _logger.add(
-            log_dir / "webctp_error.log",
-            format=self._get_file_format(),
-            level="ERROR",
-            rotation="500 MB",
-            retention="30 days",
-            compression="zip",
-            backtrace=True,
-            diagnose=True,
-        )
+        # 添加错误日志文件处理器
+        error_log_config = Logger._config.get('error_log', {})
+        if error_log_config.get('enabled', True):
+            _logger.add(
+                log_dir / error_log_config.get('filename', 'webctp_error.log'),
+                format=error_log_config.get('format', DEFAULT_CONFIG['error_log']['format']),
+                level=error_log_config.get('level', 'ERROR'),
+                rotation=error_log_config.get('rotation', '500 MB'),
+                retention=error_log_config.get('retention', '30 days'),
+                compression=error_log_config.get('compression', 'zip'),
+                backtrace=backtrace,
+                diagnose=diagnose,
+            )
         
         Logger._initialized = True
     
     @staticmethod
-    def _get_console_format() -> str:
-        """获取控制台日志格式"""
-        return (
-            "<green>{time:YYYY-MM-DD HH:mm:ss.SSS}</green> | "
-            "<level>{level: <8}</level> | "
-            "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> | "
-            "<level>{message}</level>"
-        )
-    
-    @staticmethod
-    def _get_file_format() -> str:
-        """获取文件日志格式"""
-        return (
-            "{time:YYYY-MM-DD HH:mm:ss.SSS} | "
-            "{level: <8} | "
-            "{name}:{function}:{line} | "
-            "{message}"
-        )
+    def get_config() -> dict[str, Any]:
+        """获取当前日志配置"""
+        return Logger._config.copy()
     
     @staticmethod
     def _get_trace_id() -> Optional[str]:
@@ -217,17 +299,14 @@ class Logger:
             self.set_trace_id(trace_id)
             try:
                 formatted_message = self._format_message(message, tag)
-                # 使用 opt(depth=2) 跳过 _log_with_trace 和 debug/info/error 的栈帧，指向实际调用者
                 _logger.opt(depth=2).log(log_func.__name__.upper(), formatted_message, **kwargs)
             finally:
-                # 恢复之前的 trace_id
                 if previous_trace_id:
                     self.set_trace_id(previous_trace_id)
                 else:
                     self.clear_trace_id()
         else:
             formatted_message = self._format_message(message, tag)
-            # 使用 opt(depth=2) 跳过 _log_with_trace 和 debug/info/error 的栈帧，指向实际调用者
             _logger.opt(depth=2).log(log_func.__name__.upper(), formatted_message, **kwargs)
     
     def _format_message(self, message: str, tag: Optional[str] = None) -> str:
@@ -266,16 +345,7 @@ class Logger:
             message: 日志消息
             tag: 日志标签（可选）
             trace_id: 追踪 ID（可选）
-                - True: 自动生成 UUID
-                - str: 使用指定的 trace_id
-                - None/False: 不添加 trace_id
             **kwargs: 其他参数
-            
-        示例：
-            logger.debug("调试信息")
-            logger.debug("调试信息", tag="database")
-            logger.debug("调试信息", trace_id=True)  # 自动生成 trace_id
-            logger.debug("调试信息", trace_id="req-123")  # 指定 trace_id
         """
         self._log_with_trace(message, tag, trace_id, _logger.debug, **kwargs)
     
@@ -287,15 +357,7 @@ class Logger:
             message: 日志消息
             tag: 日志标签（可选）
             trace_id: 追踪 ID（可选）
-                - True: 自动生成 UUID
-                - str: 使用指定的 trace_id
-                - None/False: 不添加 trace_id
             **kwargs: 其他参数
-            
-        示例：
-            logger.info("信息")
-            logger.info("信息", tag="auth")
-            logger.info("信息", trace_id=True)
         """
         self._log_with_trace(message, tag, trace_id, _logger.info, **kwargs)
     
