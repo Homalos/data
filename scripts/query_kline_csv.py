@@ -2,11 +2,30 @@
 # -*- coding: utf-8 -*-
 """
 查询CSV格式的K线数据
+
+用法：
+python scripts\query_kline_csv.py <command> <trading_day> <period> <instrument_id> [--limit <limit>]
+
+查询K线数据（显示最后10条）
+python scripts\query_kline_csv.py query 20251230 1m FG605
+
+查询更多条数
+python scripts\query_kline_csv.py query 20251230 1m FG605 --limit 50
+
+显示全部K线
+python scripts\query_kline_csv.py query 20251230 1m FG605 --limit 0
+
+列出某交易日某周期的所有合约
+python scripts\query_kline_csv.py list 20251230 1m
+
+列出所有交易日
+python scripts\query_kline_csv.py days
+
+周期参数可选：1m, 3m, 5m, 10m, 15m, 30m, 60m, 1d
 """
-import csv
 import argparse
+import csv
 from pathlib import Path
-from datetime import datetime
 
 
 def query_kline(trading_day: str, period: str, instrument_id: str, limit: int = 10):
@@ -138,7 +157,7 @@ if __name__ == "__main__":
     
     # days命令
     days_parser = subparsers.add_parser('days', help='列出所有交易日')
-    
+
     args = parser.parse_args()
     
     if args.command == 'query':
