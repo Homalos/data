@@ -34,6 +34,8 @@ class MdGateway(mdapi.CThostFtdcMdSpi):
         self._request_id: int = 0
         # Reconnection control
         self._reconnection_ctrl = ReconnectionController(max_attempts=5, interval=10.0, client_type="Md")
+        # 订阅状态跟踪（用于重连后自动重新订阅）
+        self._subscribed_instruments: set[str] = set()
 
         logger.info(f"Md front_address: {self._front_address}", tag='md_client')
 
@@ -220,6 +222,8 @@ class MdGateway(mdapi.CThostFtdcMdSpi):
         """
         if rsp_info is None or rsp_info.ErrorID == 0:
             logger.info("Md login success")
+            # 登录成功后，检查是否需要重新订阅
+            self._resubscribe_instruments()
         else:
             logger.info("Md login failed, please try again")
 
@@ -241,6 +245,28 @@ class MdGateway(mdapi.CThostFtdcMdSpi):
             "UserID": rsp_user_login.UserID
         }
         self.rsp_callback(response)
+    
+    def _resubscribe_instruments(self) -> None:
+        """
+        重新订阅之前已订阅的合约
+        
+        在断线重连并登录成功后调用，自动恢复之前的订阅状态
+        """
+        if not self._subscribed_instruments:
+            return
+        
+        instruments_list = list(self._subscribed_instruments)
+        logger.info(f"重连后自动重新订阅 {len(instruments_list)} 个合约")
+        
+        try:
+            instrument_ids = [i.encode() for i in instruments_list]
+            ret = self._api.SubscribeMarketData(instrument_ids, len(instrument_ids))
+            if ret == 0:
+                logger.info(f"重新订阅请求发送成功，共 {len(instruments_list)} 个合约")
+            else:
+                logger.error(f"重新订阅请求发送失败，错误码: {ret}")
+        except Exception as e:
+            logger.error(f"重新订阅异常: {e}")
 
     def OnRspSubMarketData(
             self,
@@ -383,6 +409,10 @@ class MdGateway(mdapi.CThostFtdcMdSpi):
             None: 无直接返回值，通过回调函数返回响应数据
         """
         instrument_ids = request[Constant.InstrumentID]
+        # 记录订阅的合约（用于重连后自动重新订阅）
+        for inst_id in instrument_ids:
+            self._subscribed_instruments.add(inst_id)
+        
         instrument_ids = list(map(lambda i: i.encode(), instrument_ids))
         # logger.debug(f"Subscribe data for {instrument_ids}")
         ret = self._api.SubscribeMarketData(instrument_ids, len(instrument_ids))
@@ -402,6 +432,10 @@ class MdGateway(mdapi.CThostFtdcMdSpi):
             None
         """
         instrument_ids = request[Constant.InstrumentID]
+        # 从订阅列表中移除
+        for inst_id in instrument_ids:
+            self._subscribed_instruments.discard(inst_id)
+        
         instrument_ids = list(map(lambda i: i.encode(), instrument_ids))
         logger.debug(f"UnSubscribe data for {instrument_ids}")
         ret = self._api.UnSubscribeMarketData(instrument_ids, len(instrument_ids))
